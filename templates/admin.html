@@ -139,6 +139,26 @@ html,body{height:100%;background:var(--bg);font-family:var(--font-body);color:va
 #toast.toast-error{border-color:rgba(239,68,68,.35);color:var(--red)}
 
 .hidden{display:none!important}
+.user-select-btn{width:100%;padding:9px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-mid);font-family:var(--font-body);font-size:.82rem;font-weight:600;cursor:pointer;text-align:left;transition:all .18s}
+.user-select-btn:hover{background:rgba(124,58,237,.08);color:var(--text)}
+.user-select-btn.active{background:rgba(124,58,237,.12);color:var(--violet-light);border-color:rgba(124,58,237,.3)}
+.conv-item{padding:10px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:all .18s}
+.conv-item:hover{background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2)}
+.conv-title{font-size:.84rem;font-weight:600;color:var(--text)}
+.conv-date{font-size:.7rem;color:var(--text-light);margin-top:2px}
+.cv-msg{display:flex;gap:10px;align-items:flex-start}
+.cv-msg.user{flex-direction:row-reverse}
+.cv-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0}
+.cv-msg.ai .cv-av{background:linear-gradient(135deg,#7c3aed,#ec4899);color:white}
+.cv-msg.user .cv-av{background:linear-gradient(135deg,#f97316,#fbbf24);color:white}
+.cv-bubble{padding:10px 14px;border-radius:16px;font-size:.82rem;line-height:1.55;max-width:75%;word-break:break-word}
+.cv-msg.ai .cv-bubble{background:var(--surface);border:1.5px solid var(--border);color:var(--text)}
+.cv-msg.user .cv-bubble{background:linear-gradient(135deg,#7c3aed,#ec4899);color:white}
+.mem-entry{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px}
+.mem-entry-text{flex:1;font-size:.84rem;color:var(--text)}
+.mem-entry-date{font-size:.68rem;color:var(--text-light)}
+.btn-del-mem-admin{padding:4px 10px;border-radius:8px;border:1.5px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:var(--red);font-size:.72rem;font-weight:600;cursor:pointer;transition:all .18s}
+.btn-del-mem-admin:hover{background:rgba(239,68,68,.18);border-color:var(--red)}
 </style>
 </head>
 <body>
@@ -178,6 +198,8 @@ html,body{height:100%;background:var(--bg);font-family:var(--font-body);color:va
       <button class="nav-item active" onclick="showPanel('overview')" id="nav-overview"><span class="nav-icon">📊</span>Overview</button>
       <button class="nav-item" onclick="showPanel('users')" id="nav-users"><span class="nav-icon">👥</span>Users</button>
       <button class="nav-item" onclick="showPanel('popups')" id="nav-popups"><span class="nav-icon">📢</span>Broadcasts</button>
+      <button class="nav-item" onclick="showPanel('chats')" id="nav-chats"><span class="nav-icon">💬</span>User Chats</button>
+      <button class="nav-item" onclick="showPanel('memory')" id="nav-memory"><span class="nav-icon">🧠</span>Memories</button>
     </nav>
 
     <!-- Content -->
@@ -243,6 +265,50 @@ html,body{height:100%;background:var(--bg);font-family:var(--font-body);color:va
             <button class="btn-sm btn-danger" onclick="clearPopup()">Clear Popup</button>
           </div>
           <div class="active-popup-msg" id="active-popup-msg"></div>
+        </div>
+      </div>
+
+      <!-- CHATS VIEWER -->
+      <div class="panel" id="panel-chats">
+        <div class="section-head">
+          <div class="section-title">User Chats</div>
+          <span class="section-count" id="chats-user-label">Select a user</span>
+        </div>
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+          <div style="min-width:220px;flex-shrink:0">
+            <div style="font-size:.7rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Users</div>
+            <div id="chats-user-list" style="display:flex;flex-direction:column;gap:6px"></div>
+          </div>
+          <div style="flex:1;min-width:260px">
+            <div style="font-size:.7rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Conversations</div>
+            <div id="chats-conv-list" style="display:flex;flex-direction:column;gap:6px"></div>
+          </div>
+        </div>
+        <!-- Chat Viewer Modal -->
+        <div id="chat-viewer" style="display:none;margin-top:24px;background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div class="section-title" id="chat-viewer-title">Chat</div>
+            <button class="btn-sm btn-danger" onclick="closeChatViewer()">Close</button>
+          </div>
+          <div id="chat-viewer-messages" style="display:flex;flex-direction:column;gap:10px;max-height:500px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent"></div>
+        </div>
+      </div>
+
+      <!-- MEMORY VIEWER -->
+      <div class="panel" id="panel-memory">
+        <div class="section-head">
+          <div class="section-title">User Memories</div>
+          <span class="section-count" id="mem-user-label">Select a user</span>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div style="min-width:220px;flex-shrink:0">
+            <div style="font-size:.7rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Users</div>
+            <div id="mem-user-list" style="display:flex;flex-direction:column;gap:6px"></div>
+          </div>
+          <div style="flex:1;min-width:260px">
+            <div style="font-size:.7rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Memories</div>
+            <div id="mem-entries" style="display:flex;flex-direction:column;gap:8px"></div>
+          </div>
         </div>
       </div>
 
@@ -426,6 +492,130 @@ async function clearPopup() {
   } catch {}
 }
 
+
+// ── Chat Viewer ──
+let selectedChatUser = null;
+
+async function loadChatsPanel() {
+  const list = document.getElementById('chats-user-list');
+  list.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">Loading…</div>';
+  try {
+    const res = await fetch('/api/admin/users', { headers: authHeaders() });
+    const users = await res.json();
+    list.innerHTML = '';
+    if (!users.length) { list.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">No users</div>'; return; }
+    users.forEach(u => {
+      const btn = document.createElement('button');
+      btn.className = 'user-select-btn' + (selectedChatUser === u.email ? ' active' : '');
+      btn.innerHTML = `<div>${escHtml(u.name)}</div><div style="font-size:.7rem;color:var(--text-light)">${escHtml(u.email)}</div>`;
+      btn.onclick = () => selectChatUser(u.email, u.name, btn);
+      list.appendChild(btn);
+    });
+  } catch { list.innerHTML = '<div style="color:var(--red);font-size:.82rem">Error loading users</div>'; }
+}
+
+async function selectChatUser(email, name, btn) {
+  selectedChatUser = email;
+  document.querySelectorAll('#chats-user-list .user-select-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('chats-user-label').textContent = name;
+  document.getElementById('chat-viewer').style.display = 'none';
+  const convList = document.getElementById('chats-conv-list');
+  convList.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">Loading chats…</div>';
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/chats`, { headers: authHeaders() });
+    const chats = await res.json();
+    convList.innerHTML = '';
+    if (!chats.length) { convList.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">No chats yet</div>'; return; }
+    chats.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'conv-item';
+      d.innerHTML = `<div class="conv-title">${escHtml(c.title || 'Untitled')}</div><div class="conv-date">${c.date || ''}</div>`;
+      d.onclick = () => openChatViewer(email, c.id, c.title);
+      convList.appendChild(d);
+    });
+  } catch { convList.innerHTML = '<div style="color:var(--red);font-size:.82rem">Error loading chats</div>'; }
+}
+
+async function openChatViewer(email, chatId, title) {
+  const viewer = document.getElementById('chat-viewer');
+  const msgs = document.getElementById('chat-viewer-messages');
+  document.getElementById('chat-viewer-title').textContent = title || 'Chat';
+  msgs.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">Loading…</div>';
+  viewer.style.display = 'block';
+  viewer.scrollIntoView({ behavior: 'smooth' });
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/chats/${chatId}`, { headers: authHeaders() });
+    const chat = await res.json();
+    msgs.innerHTML = '';
+    (chat.messages || []).filter(m => m.role !== 'system').forEach(m => {
+      const d = document.createElement('div');
+      const role = m.role === 'user' ? 'user' : 'ai';
+      d.className = `cv-msg ${role}`;
+      d.innerHTML = `<div class="cv-av">${role === 'ai' ? 'V' : 'U'}</div><div class="cv-bubble">${escHtml(m.content)}</div>`;
+      msgs.appendChild(d);
+    });
+    if (!msgs.children.length) msgs.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">Empty chat</div>';
+  } catch { msgs.innerHTML = '<div style="color:var(--red);font-size:.82rem">Error loading chat</div>'; }
+}
+
+function closeChatViewer() {
+  document.getElementById('chat-viewer').style.display = 'none';
+}
+
+// ── Memory Viewer ──
+let selectedMemUser = null;
+
+async function loadMemoryPanel() {
+  const list = document.getElementById('mem-user-list');
+  list.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">Loading…</div>';
+  try {
+    const res = await fetch('/api/admin/users', { headers: authHeaders() });
+    const users = await res.json();
+    list.innerHTML = '';
+    if (!users.length) { list.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">No users</div>'; return; }
+    users.forEach(u => {
+      const btn = document.createElement('button');
+      btn.className = 'user-select-btn' + (selectedMemUser === u.email ? ' active' : '');
+      btn.innerHTML = `<div>${escHtml(u.name)}</div><div style="font-size:.7rem;color:var(--text-light)">${escHtml(u.email)}</div>`;
+      btn.onclick = () => selectMemUser(u.email, u.name, btn);
+      list.appendChild(btn);
+    });
+  } catch { list.innerHTML = '<div style="color:var(--red);font-size:.82rem">Error</div>'; }
+}
+
+async function selectMemUser(email, name, btn) {
+  selectedMemUser = email;
+  document.querySelectorAll('#mem-user-list .user-select-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('mem-user-label').textContent = name;
+  const entries = document.getElementById('mem-entries');
+  entries.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">Loading…</div>';
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/memory`, { headers: authHeaders() });
+    const memories = await res.json();
+    entries.innerHTML = '';
+    if (!memories.length) { entries.innerHTML = '<div style="color:var(--text-light);font-size:.82rem">No memories saved</div>'; return; }
+    memories.forEach(m => {
+      const d = document.createElement('div');
+      d.className = 'mem-entry';
+      const date = m.createdAt ? new Date(m.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+      d.innerHTML = `
+        <div style="flex:1"><div class="mem-entry-text">${escHtml(m.text)}</div><div class="mem-entry-date">${date}</div></div>
+        <button class="btn-del-mem-admin" onclick="adminDeleteMemory('${escHtml(email)}','${m.id}',this.closest('.mem-entry'))">Delete</button>`;
+      entries.appendChild(d);
+    });
+  } catch { entries.innerHTML = '<div style="color:var(--red);font-size:.82rem">Error loading memories</div>'; }
+}
+
+async function adminDeleteMemory(email, id, el) {
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}/memory/${id}`, { method: 'DELETE', headers: authHeaders() });
+    if (res.ok) { el.remove(); showToast('Memory deleted', 'success'); }
+    else showToast('Failed to delete', 'error');
+  } catch { showToast('Network error', 'error'); }
+}
+
 // ── Nav ──
 function showPanel(name) {
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -433,6 +623,8 @@ function showPanel(name) {
   document.getElementById(`panel-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name==='users') loadUsers();
+  if (name==='chats') loadChatsPanel();
+  if (name==='memory') loadMemoryPanel();
 }
 
 // ── Toast ──

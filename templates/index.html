@@ -852,6 +852,13 @@ function isWeatherQuery(text) {
   return /weather|temperature|forecast|rain|sunny|cloudy|snow|wind|humidity|hot outside|cold outside|degrees/i.test(text);
 }
 
+function isLocationQuery(text) {
+  return /nearest|closest|near me|nearby|around me|close to me|my location|where am i|current location|find a .*(store|shop|restaurant|pharmacy|hospital|bank|gas|hotel|gym|clinic|school|park|cafe|coffee|supermarket|mall|market)/i.test(text)
+    || /what('s| is) my (location|address|city|country|position|coordinates)/i.test(text)
+    || /where (am i|do i live|are we)/i.test(text)
+    || /(store|shop|restaurant|pharmacy|hospital|bank|gas station|hotel|gym|clinic|cafe|supermarket|mall).*(near|nearby|closest|around)/i.test(text);
+}
+
 function getBrowserLocation() {
   return new Promise(resolve => {
     if (!navigator.geolocation) { resolve(null); return; }
@@ -906,7 +913,7 @@ async function sendMessage() {
   }
 
   let coords = null;
-  if (isWeatherQuery(text)) coords = await getBrowserLocation();
+  if (isWeatherQuery(text) || isLocationQuery(text)) coords = await getBrowserLocation();
 
   try {
     const res = await fetch('/api/chat', {

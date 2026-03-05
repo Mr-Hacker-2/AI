@@ -6,31 +6,34 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'templates')));
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 
-// Proxy endpoint — keeps API key server-side
 app.post('/api/chat', (req, res) => {
   const { messages, system } = req.body;
 
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on server.' });
+  if (!OPENROUTER_API_KEY) {
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY not set on server.' });
   }
 
+  const allMessages = [
+    { role: 'system', content: system || 'You are AXIOM, a sleek, highly capable AI assistant with a slightly futuristic but friendly personality. Be concise, precise, and helpful.' },
+    ...messages
+  ];
+
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1000,
-    system: system || 'You are AXIOM, a sleek, highly capable AI assistant with a slightly futuristic but friendly personality. Be concise, precise, and helpful.',
-    messages
+    model: 'meta-llama/llama-3.3-70b-instruct:free',
+    messages: allMessages
   });
 
   const options = {
-    hostname: 'api.anthropic.com',
-    path: '/v1/messages',
+    hostname: 'openrouter.ai',
+    path: '/api/v1/chat/completions',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'HTTP-Referer': 'https://ai-1x5q.onrender.com',
+      'X-Title': 'AXIOM AI',
       'Content-Length': Buffer.byteLength(payload)
     }
   };
@@ -40,7 +43,9 @@ app.post('/api/chat', (req, res) => {
     apiRes.on('data', chunk => data += chunk);
     apiRes.on('end', () => {
       try {
-        res.status(apiRes.statusCode).json(JSON.parse(data));
+        const parsed = JSON.parse(data);
+        const text = parsed.choices?.[0]?.message?.content || 'Signal lost. Please try again.';
+        res.json({ content: [{ text }] });
       } catch {
         res.status(500).json({ error: 'Invalid response from API' });
       }

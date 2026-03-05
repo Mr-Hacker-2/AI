@@ -15,8 +15,8 @@ const B2_APP_KEY     = process.env.B2_APP_KEY || '';
 const B2_BUCKET_NAME = process.env.B2_BUCKET_NAME || '';
 const B2_ENDPOINT    = process.env.B2_ENDPOINT || '';
 
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'admin1';
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin1';
 
 // Active popup broadcast (in-memory, fast)
 let activePopup = null; // { message, type, id, createdAt }

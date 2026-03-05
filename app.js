@@ -252,18 +252,16 @@ function callOpenRouter(allMessages) {
   });
 }
 
-// ── Image Generation via OpenRouter ──
+// ── Image Generation via OpenRouter (Flux Schnell) ──
 function callOpenRouterImage(prompt) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({
-      model: 'openai/dall-e-3',
-      prompt: prompt,
-      n: 1,
-      size: '1024x1024'
+      model: 'google/gemini-2.0-flash-exp:free',
+      messages: [{ role: 'user', content: prompt }]
     });
     const options = {
       hostname: 'openrouter.ai',
-      path: '/api/v1/images/generations',
+      path: '/api/v1/chat/completions',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -279,10 +277,22 @@ function callOpenRouterImage(prompt) {
         try {
           const p = JSON.parse(d);
           if (p.error) return reject({ message: p.error.message || JSON.stringify(p.error) });
-          const url = p.data?.[0]?.url;
-          if (!url) return reject({ message: 'No image URL returned: ' + d });
-          resolve(url);
-        } catch { reject({ message: 'Parse error: ' + d }); }
+          const content = p.choices?.[0]?.message?.content;
+          // Gemini returns array of parts
+          if (Array.isArray(content)) {
+            const imgPart = content.find(c => c.type === 'image_url');
+            if (imgPart?.image_url?.url) return resolve(imgPart.image_url.url);
+            // Inline base64 data
+            const inlinePart = content.find(c => c.type === 'inline_data' || c.inline_data);
+            if (inlinePart) {
+              const d = inlinePart.inline_data || inlinePart;
+              return resolve(`data:${d.mime_type};base64,${d.data}`);
+            }
+          }
+          if (typeof content === 'string' && content.startsWith('http')) return resolve(content);
+          if (typeof content === 'string' && content.startsWith('data:')) return resolve(content);
+          reject({ message: 'No image in response: ' + JSON.stringify(p).slice(0, 300) });
+        } catch(e) { reject({ message: 'Parse error: ' + e.message }); }
       });
     });
     req.on('error', err => reject({ message: err.message }));

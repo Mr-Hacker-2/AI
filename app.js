@@ -313,8 +313,55 @@ app.post('/api/image', async (req, res) => {
 });
 
 
+// ── Deep Search ──
+app.post('/api/deepsearch', async (req, res) => {
+  const { query, email } = req.body;
+  if (!query) return res.status(400).json({ error: 'Missing query' });
+  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OPENROUTER_API_KEY not set.' });
+
+  let memoryCtx = '';
+  if (email) {
+    const memories = await getMemory(email);
+    if (memories.length > 0) {
+      memoryCtx = '\n\n[USER MEMORIES: ' + memories.map(m => `- ${m.text}`).join('\n') + ']';
+    }
+  }
+
+  const systemPrompt = `You are Viora, an expert research assistant. When given a topic or question, produce a thorough, well-structured deep research report. 
+
+Format your response using this structure:
+# [Title]
+
+## Overview
+[2-3 sentence summary]
+
+## [Section 1 — relevant heading]
+[Detailed content with facts, tips, explanations]
+
+## [Section 2]
+[Continue as needed, 3-6 sections total]
+
+## Key Takeaways
+- Bullet point summary of the most important points
+
+Use clear headings, be comprehensive, accurate, and well-organized. Write at least 400 words.${memoryCtx}`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Deep research topic: ${query}` }
+  ];
+
+  try {
+    const text = await callOpenRouter(messages);
+    res.json({ content: [{ text }] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 app.post('/api/chat', async (req,res)=>{
-  const {messages,system,coords,email}=req.body;
+  const {messages,system,coords,email,image}=req.body;
   if (!OPENROUTER_API_KEY) return res.status(500).json({error:'OPENROUTER_API_KEY not set.'});
   let weatherCtx='';
   if (coords?.lat&&coords?.lon) {
@@ -351,7 +398,22 @@ app.post('/api/chat', async (req,res)=>{
       await saveMemory(email, existing);
     }
   }
-  const allMessages=[{role:'system',content:(system||'You are Viora, a friendly helpful AI.')+weatherCtx+locationCtx+memoryCtx},...messages];
+  // Build messages — inject image into last user message if provided
+  let builtMessages = messages.map(m => ({ ...m }));
+  if (image) {
+    const lastIdx = builtMessages.map(m=>m.role).lastIndexOf('user');
+    if (lastIdx >= 0) {
+      const lastMsg = builtMessages[lastIdx];
+      builtMessages[lastIdx] = {
+        role: 'user',
+        content: [
+          { type: 'text', text: typeof lastMsg.content === 'string' ? lastMsg.content : '' },
+          { type: 'image_url', image_url: { url: image } }
+        ]
+      };
+    }
+  }
+  const allMessages=[{role:'system',content:(system||'You are Viora, a friendly helpful AI.')+weatherCtx+locationCtx+memoryCtx},...builtMessages];
   try { const text=await callOpenRouter(allMessages); res.json({content:[{text}]}); }
   catch(err){ res.status(500).json({error:err.message}); }
 });

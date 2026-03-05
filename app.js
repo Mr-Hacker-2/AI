@@ -253,14 +253,33 @@ function callOpenRouter(allMessages) {
 }
 
 app.post('/api/chat', async (req,res)=>{
-  const {messages,system,coords}=req.body;
+  const {messages,system,coords,email}=req.body;
   if (!OPENROUTER_API_KEY) return res.status(500).json({error:'OPENROUTER_API_KEY not set.'});
   let weatherCtx='';
   if (coords?.lat&&coords?.lon) {
     const [place,weather]=await Promise.all([reverseGeocode(coords.lat,coords.lon),getWeatherFromCoords(coords.lat,coords.lon)]);
     if (weather) { const loc=place?`${place.city}, ${place.country}`:`${coords.lat},${coords.lon}`; weatherCtx=`\n\n[LIVE WEATHER (${loc}): ${weather}]`; }
   }
-  const allMessages=[{role:'system',content:(system||'You are Viora, a friendly helpful AI.')+weatherCtx},...messages];
+  // Inject memories into system prompt
+  let memoryCtx='';
+  if (email) {
+    const memories = await getMemory(email);
+    if (memories.length > 0) {
+      memoryCtx = '\n\n[THINGS YOU REMEMBER ABOUT THIS USER:\n' + memories.map(m=>`- ${m.text}`).join('\n') + '\nUse this naturally without announcing it every time.]';
+    }
+  }
+  // Auto-detect "remember: ..." and save to memory
+  const lastUserMsg = [...messages].reverse().find(m=>m.role==='user');
+  if (email && lastUserMsg) {
+    const rememberMatch = lastUserMsg.content.match(/^remember:\s*(.+)/i);
+    if (rememberMatch) {
+      const memText = rememberMatch[1].trim();
+      const existing = await getMemory(email);
+      existing.push({ id: Date.now().toString(), text: memText, createdAt: new Date().toISOString() });
+      await saveMemory(email, existing);
+    }
+  }
+  const allMessages=[{role:'system',content:(system||'You are Viora, a friendly helpful AI.')+weatherCtx+memoryCtx},...messages];
   try { const text=await callOpenRouter(allMessages); res.json({content:[{text}]}); }
   catch(err){ res.status(500).json({error:err.message}); }
 });
@@ -268,3 +287,73 @@ app.post('/api/chat', async (req,res)=>{
 app.get('/', (req,res) => res.sendFile(path.join(__dirname,'templates','index.html')));
 const PORT = process.env.PORT||3000;
 app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
+
+// ── Admin: get user chat list ──
+app.get('/api/admin/users/:email/chats', adminAuth, async (req, res) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase();
+  const index = await getChatIndex(email);
+  res.json(index);
+});
+
+// ── Admin: get specific chat ──
+app.get('/api/admin/users/:email/chats/:chatId', adminAuth, async (req, res) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase();
+  const chat = await b2Get(`chats/${emailToKey(email)}/${req.params.chatId}.json`);
+  if (!chat) return res.status(404).json({ error: 'Not found' });
+  res.json(chat);
+});
+
+// ── Memory helpers ──
+async function getMemory(email) { return (await b2Get(`memory/${emailToKey(email)}.json`)) || []; }
+async function saveMemory(email, memories) { return b2Put(`memory/${emailToKey(email)}.json`, memories); }
+
+// Get user memories
+app.get('/api/memory', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  res.json(await getMemory(email));
+});
+
+// Add a memory
+app.post('/api/memory', async (req, res) => {
+  const { email, text } = req.body;
+  if (!email || !text) return res.status(400).json({ error: 'Missing fields' });
+  const memories = await getMemory(email);
+  const entry = { id: Date.now().toString(), text: text.trim(), createdAt: new Date().toISOString() };
+  memories.push(entry);
+  await saveMemory(email, memories);
+  res.json(entry);
+});
+
+// Delete a memory
+app.delete('/api/memory/:id', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  let memories = await getMemory(email);
+  memories = memories.filter(m => m.id !== req.params.id);
+  await saveMemory(email, memories);
+  res.json({ success: true });
+});
+
+// Clear all memories
+app.delete('/api/memory', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  await saveMemory(email, []);
+  res.json({ success: true });
+});
+
+// Admin: view user memories
+app.get('/api/admin/users/:email/memory', adminAuth, async (req, res) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase();
+  res.json(await getMemory(email));
+});
+
+// Admin: delete a specific user memory
+app.delete('/api/admin/users/:email/memory/:id', adminAuth, async (req, res) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase();
+  let memories = await getMemory(email);
+  memories = memories.filter(m => m.id !== req.params.id);
+  await saveMemory(email, memories);
+  res.json({ success: true });
+});

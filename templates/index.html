@@ -291,6 +291,51 @@ header {
   #sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 16; }
   #sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-w))); width: var(--sidebar-w); }
 }
+
+/* ── ADMIN POPUP ── */
+#admin-popup-overlay{position:fixed;inset:0;z-index:100;background:rgba(30,16,48,.6);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .3s ease both}
+#admin-popup-overlay.hidden{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.admin-popup-card{background:white;border:1.5px solid var(--border);border-radius:26px;padding:36px 34px;max-width:420px;width:100%;box-shadow:0 16px 60px rgba(124,58,237,.18);animation:fadeUp .35s ease both;text-align:center;position:relative}
+.admin-popup-icon{font-size:2.6rem;margin-bottom:14px}
+.admin-popup-title{font-family:var(--font-head);font-size:1.4rem;font-weight:800;margin-bottom:10px}
+.admin-popup-msg{font-size:.88rem;color:var(--text-mid);line-height:1.7;margin-bottom:24px}
+.admin-popup-card.info .admin-popup-title{background:linear-gradient(135deg,#06b6d4,#0284c7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.admin-popup-card.success .admin-popup-title{background:linear-gradient(135deg,#22c55e,#16a34a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.admin-popup-card.warning .admin-popup-title{background:linear-gradient(135deg,#f59e0b,#d97706);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.admin-popup-card.error .admin-popup-title{background:linear-gradient(135deg,#ef4444,#dc2626);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.btn-close-popup{padding:11px 32px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--grad-a),var(--grad-b));color:white;font-family:var(--font-head);font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.35);transition:all .2s}
+.btn-close-popup:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(124,58,237,.5)}
+
+/* ── ADMIN POPUP ── */
+#admin-popup {
+  display: none; position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 999; min-width: 300px; max-width: 520px; width: 90%;
+  border-radius: 18px; padding: 16px 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  animation: popupIn .4s cubic-bezier(.34,1.56,.64,1) both;
+  display: none; align-items: flex-start; gap: 12px;
+}
+#admin-popup.show { display: flex; }
+@keyframes popupIn { from { opacity:0; transform:translateX(-50%) translateY(-16px) scale(.95); } to { opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
+#admin-popup.pop-info    { background:#ede9ff; border: 1.5px solid #c4b5fd; }
+#admin-popup.pop-success { background:#dcfce7; border: 1.5px solid #86efac; }
+#admin-popup.pop-warning { background:#fef9c3; border: 1.5px solid #fde047; }
+#admin-popup.pop-error   { background:#fee2e2; border: 1.5px solid #fca5a5; }
+.popup-body { flex: 1; }
+.popup-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+.popup-title { font-family: var(--font-head); font-size: .82rem; font-weight: 700; margin-bottom: 3px; }
+#admin-popup.pop-info    .popup-title { color: #5b21b6; }
+#admin-popup.pop-success .popup-title { color: #15803d; }
+#admin-popup.pop-warning .popup-title { color: #a16207; }
+#admin-popup.pop-error   .popup-title { color: #b91c1c; }
+.popup-text { font-size: .86rem; line-height: 1.5; }
+#admin-popup.pop-info    .popup-text { color: #4c1d95; }
+#admin-popup.pop-success .popup-text { color: #166534; }
+#admin-popup.pop-warning .popup-text { color: #854d0e; }
+#admin-popup.pop-error   .popup-text { color: #991b1b; }
+.popup-close { background: none; border: none; cursor: pointer; font-size: 1rem; opacity: .6; transition: opacity .15s; padding: 2px; flex-shrink: 0; }
+.popup-close:hover { opacity: 1; }
 </style>
 </head>
 <body>
@@ -424,23 +469,10 @@ header {
 </div>
 
 <script>
-// ── Storage helpers ──
-const USERS_KEY = 'viora_users';
+// ── Session (kept in sessionStorage) ──
 const SESSION_KEY = 'viora_session';
-const CHATS_KEY = 'viora_chats';
-
-const getUsers = () => { try { return JSON.parse(localStorage.getItem(USERS_KEY) || '{}'); } catch { return {}; } };
-const saveUsers = u => localStorage.setItem(USERS_KEY, JSON.stringify(u));
 const getSession = () => { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const saveSession = s => sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
-
-// Chat history per user: { email: [ { id, title, messages, date } ] }
-function getChatsForUser(email) {
-  try { const all = JSON.parse(localStorage.getItem(CHATS_KEY) || '{}'); return all[email] || []; } catch { return []; }
-}
-function saveChatsForUser(email, chats) {
-  try { const all = JSON.parse(localStorage.getItem(CHATS_KEY) || '{}'); all[email] = chats; localStorage.setItem(CHATS_KEY, JSON.stringify(all)); } catch {}
-}
 
 // ── State ──
 let currentChatId = null;
@@ -457,19 +489,24 @@ function switchTab(tab) {
   document.getElementById('signup-form').classList.toggle('hidden', tab!=='signup');
 }
 
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pw = document.getElementById('login-password').value;
   const err = document.getElementById('login-error');
   err.textContent = '';
   if (!email || !pw) { err.textContent = 'Please fill in all fields.'; return; }
-  const users = getUsers();
-  if (!users[email] || users[email].password !== btoa(pw)) { err.textContent = 'Invalid email or password.'; return; }
-  saveSession({ email, name: users[email].name, isTrial: false });
-  openChat(users[email].name, false, email);
+  err.textContent = 'Logging in…';
+  try {
+    const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error || 'Login failed.'; return; }
+    err.textContent = '';
+    saveSession({ email, name: data.name, isTrial: false });
+    openChat(data.name, false, email);
+  } catch { err.textContent = 'Network error. Try again.'; }
 }
 
-function doSignup() {
+async function doSignup() {
   const name = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim().toLowerCase();
   const pw = document.getElementById('signup-password').value;
@@ -478,12 +515,15 @@ function doSignup() {
   if (!name || !email || !pw) { err.textContent = 'Please fill in all fields.'; return; }
   if (pw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
   if (!email.includes('@')) { err.textContent = 'Please enter a valid email.'; return; }
-  const users = getUsers();
-  if (users[email]) { err.textContent = 'An account with this email already exists.'; return; }
-  users[email] = { name, password: btoa(pw) };
-  saveUsers(users);
-  saveSession({ email, name, isTrial: false });
-  openChat(name, false, email);
+  err.textContent = 'Creating account…';
+  try {
+    const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw }) });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error || 'Signup failed.'; return; }
+    err.textContent = '';
+    saveSession({ email, name: data.name, isTrial: false });
+    openChat(data.name, false, email);
+  } catch { err.textContent = 'Network error. Try again.'; }
 }
 
 async function startTrial() {
@@ -549,37 +589,37 @@ function toggleSidebar() {
   document.getElementById('sidebar-overlay').classList.toggle('show', sidebarOpen && window.innerWidth < 900);
 }
 
-// ── Chat history ──
-function renderHistory(email) {
+// ── Chat history (B2-backed) ──
+async function renderHistory(email) {
   if (!email) return;
-  const chats = getChatsForUser(email);
   const list = document.getElementById('chat-history-list');
   const empty = document.getElementById('history-empty');
   list.querySelectorAll('.history-item').forEach(el => el.remove());
-
-  if (chats.length === 0) { empty.style.display = ''; return; }
-  empty.style.display = 'none';
-
-  chats.slice().reverse().forEach(chat => {
-    const item = document.createElement('div');
-    item.className = 'history-item' + (chat.id === currentChatId ? ' active' : '');
-    item.dataset.id = chat.id;
-    item.innerHTML = `
-      <span class="history-item-icon">💬</span>
-      <div class="history-item-text">
-        <div class="history-item-title">${escHtml(chat.title)}</div>
-        <div class="history-item-date">${chat.date}</div>
-      </div>
-      <button class="history-item-del" onclick="deleteChat(event,'${chat.id}')" title="Delete">✕</button>`;
-    item.addEventListener('click', () => loadChat(chat.id));
-    list.appendChild(item);
-  });
+  try {
+    const res = await fetch(`/api/chats?email=${encodeURIComponent(email)}`);
+    const chats = await res.json();
+    if (!Array.isArray(chats) || chats.length === 0) { empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    chats.forEach(chat => {
+      const item = document.createElement('div');
+      item.className = 'history-item' + (chat.id === currentChatId ? ' active' : '');
+      item.dataset.id = chat.id;
+      item.innerHTML = `
+        <span class="history-item-icon">💬</span>
+        <div class="history-item-text">
+          <div class="history-item-title">${escHtml(chat.title || 'Untitled')}</div>
+          <div class="history-item-date">${chat.date || ''}</div>
+        </div>
+        <button class="history-item-del" onclick="deleteChat(event,'${chat.id}')" title="Delete">✕</button>`;
+      item.addEventListener('click', () => loadChat(chat.id));
+      list.appendChild(item);
+    });
+  } catch { empty.style.display = ''; }
 }
 
 function newChat() {
   const session = getSession();
   if (!session || session.isTrial) return;
-  // Save current chat first
   saveChatIfNeeded();
   startNewChat();
   if (window.innerWidth < 900) toggleSidebar();
@@ -594,47 +634,50 @@ function startNewChat() {
   if (session?.email) renderHistory(session.email);
 }
 
-function saveChatIfNeeded() {
+async function saveChatIfNeeded() {
   const session = getSession();
   if (!session?.email || history.length === 0) return;
   const firstUserMsg = history.find(m => m.role === 'user');
   if (!firstUserMsg) return;
   const title = firstUserMsg.content.slice(0, 42) + (firstUserMsg.content.length > 42 ? '…' : '');
-  const chats = getChatsForUser(session.email);
-  const idx = chats.findIndex(c => c.id === currentChatId);
-  const now = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  if (idx >= 0) {
-    chats[idx].messages = history;
-    chats[idx].title = title;
-  } else {
-    chats.push({ id: currentChatId, title, messages: history, date: now });
-  }
-  saveChatsForUser(session.email, chats);
+  try {
+    await fetch('/api/chats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: session.email, chatId: currentChatId, title, messages: history })
+    });
+  } catch (e) { console.warn('Save chat failed:', e); }
 }
 
-function loadChat(id) {
+async function loadChat(id) {
   const session = getSession();
   if (!session?.email) return;
-  saveChatIfNeeded();
-  const chats = getChatsForUser(session.email);
-  const chat = chats.find(c => c.id === id);
-  if (!chat) return;
-  currentChatId = id;
-  history = [...chat.messages];
-  clearChatWindow();
-  document.getElementById('welcome').style.display = 'none';
-  history.forEach(m => { if (m.role !== 'system') renderMsgFromHistory(m.role === 'user' ? 'user' : 'ai', m.content); });
-  renderHistory(session.email);
-  if (window.innerWidth < 900) toggleSidebar();
+  await saveChatIfNeeded();
+  try {
+    const res = await fetch(`/api/chats/${id}?email=${encodeURIComponent(session.email)}`);
+    if (!res.ok) return;
+    const chat = await res.json();
+    currentChatId = id;
+    history = [...chat.messages];
+    clearChatWindow();
+    document.getElementById('welcome').style.display = 'none';
+    history.forEach(m => { if (m.role !== 'system') renderMsgFromHistory(m.role === 'user' ? 'user' : 'ai', m.content); });
+    renderHistory(session.email);
+    if (window.innerWidth < 900) toggleSidebar();
+  } catch (e) { console.warn('Load chat failed:', e); }
 }
 
-function deleteChat(e, id) {
+async function deleteChat(e, id) {
   e.stopPropagation();
   const session = getSession();
   if (!session?.email) return;
-  let chats = getChatsForUser(session.email);
-  chats = chats.filter(c => c.id !== id);
-  saveChatsForUser(session.email, chats);
+  try {
+    await fetch(`/api/chats/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: session.email })
+    });
+  } catch {}
   if (id === currentChatId) startNewChat();
   else renderHistory(session.email);
 }
@@ -774,7 +817,7 @@ async function sendMessage() {
       const reply = data.content?.[0]?.text || 'Hmm, no response. Try again!';
       addMsg('ai', reply);
       history.push({ role: 'assistant', content: reply });
-      saveChatIfNeeded();
+      await saveChatIfNeeded();
       const session = getSession();
       if (session?.email) renderHistory(session.email);
     }
@@ -787,10 +830,98 @@ async function sendMessage() {
   inputEl.focus();
 }
 
+
+// ── Admin popup polling ──
+let lastPopupId = null;
+const POPUP_ICONS = { info:'ℹ️', success:'✅', warning:'⚠️', error:'🚨' };
+const POPUP_TITLES = { info:'Notice', success:'Update', warning:'Warning', error:'Alert' };
+
+async function pollPopup() {
+  try {
+    const res = await fetch('/api/popup');
+    const popup = await res.json();
+    if (popup && popup.id !== lastPopupId) {
+      lastPopupId = popup.id;
+      showAdminPopup(popup);
+    } else if (!popup && lastPopupId) {
+      lastPopupId = null;
+      dismissPopup();
+    }
+  } catch {}
+}
+
+function showAdminPopup(popup) {
+  const el = document.getElementById('admin-popup');
+  el.className = `show pop-${popup.type || 'info'}`;
+  document.getElementById('popup-icon').textContent = POPUP_ICONS[popup.type] || 'ℹ️';
+  document.getElementById('popup-title').textContent = POPUP_TITLES[popup.type] || 'Notice';
+  document.getElementById('popup-text').textContent = popup.message;
+}
+
+function dismissPopup() {
+  const el = document.getElementById('admin-popup');
+  el.classList.remove('show');
+}
+
+// Poll every 8 seconds when user is logged in
+setInterval(() => {
+  if (getSession() && !getSession().isTrial) pollPopup();
+}, 8000);
+
 window.addEventListener('load', () => {
   const s = getSession();
-  if (s) openChat(s.name, s.isTrial, s.email || null);
+  if (s) { openChat(s.name, s.isTrial, s.email || null); checkAdminPopup(); }
 });
+
+// ── Admin popup check ──
+const POPUP_SEEN_KEY = 'viora_popup_seen';
+
+async function checkAdminPopup() {
+  try {
+    const res   = await fetch('/api/popup');
+    const popup = await res.json();
+    if (!popup.active || !popup.message) return;
+
+    // Only show if not already dismissed this session
+    const seen = sessionStorage.getItem(POPUP_SEEN_KEY);
+    if (seen === popup.createdAt) return;
+
+    const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '🚨' };
+    document.getElementById('admin-popup-icon').textContent  = icons[popup.type] || '📣';
+    document.getElementById('admin-popup-title').textContent = popup.title || 'Notice';
+    document.getElementById('admin-popup-msg').textContent   = popup.message;
+    document.getElementById('admin-popup-card').className    = 'admin-popup-card ' + (popup.type || 'info');
+    document.getElementById('admin-popup-overlay').classList.remove('hidden');
+    // Store so it doesn't show again this session
+    sessionStorage.setItem(POPUP_SEEN_KEY, popup.createdAt || 'shown');
+  } catch {}
+}
+
+function closeAdminPopup() {
+  document.getElementById('admin-popup-overlay').classList.add('hidden');
+}
+
 </script>
+
+<!-- ADMIN POPUP -->
+<div id="admin-popup-overlay" class="hidden">
+  <div class="admin-popup-card" id="admin-popup-card">
+    <div class="admin-popup-icon" id="admin-popup-icon">📣</div>
+    <div class="admin-popup-title" id="admin-popup-title">Notice</div>
+    <div class="admin-popup-msg" id="admin-popup-msg"></div>
+    <button class="btn-close-popup" onclick="closeAdminPopup()">Got it</button>
+  </div>
+</div>
+
+
+<!-- ADMIN POPUP -->
+<div id="admin-popup">
+  <span class="popup-icon" id="popup-icon">ℹ️</span>
+  <div class="popup-body">
+    <div class="popup-title" id="popup-title">Notice</div>
+    <div class="popup-text" id="popup-text"></div>
+  </div>
+  <button class="popup-close" onclick="dismissPopup()">✕</button>
+</div>
 </body>
 </html>

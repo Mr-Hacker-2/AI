@@ -2,165 +2,269 @@ const express = require('express');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const crypto = require('crypto');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.set('trust proxy', true);
 app.use(express.static(path.join(__dirname, 'templates')));
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+const B2_KEY_ID      = process.env.B2_KEY_ID || '';
+const B2_APP_KEY     = process.env.B2_APP_KEY || '';
+const B2_BUCKET_NAME = process.env.B2_BUCKET_NAME || '';
+const B2_ENDPOINT    = process.env.B2_ENDPOINT || '';
 
-// ── IP trial tracking ──
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'admin1';
+
+// Active popup broadcast (in-memory, fast)
+let activePopup = null; // { message, type, id, createdAt }
+
+// IP trial tracking
 const usedTrialIPs = new Set();
-
 function getClientIP(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  return forwarded ? forwarded.split(',')[0].trim() : req.socket.remoteAddress;
+  const fwd = req.headers['x-forwarded-for'];
+  return fwd ? fwd.split(',')[0].trim() : req.socket.remoteAddress;
 }
 
-app.post('/api/trial-start', (req, res) => {
-  const ip = getClientIP(req);
-  console.log(`Trial attempt from IP: ${ip}`);
-  if (usedTrialIPs.has(ip)) return res.json({ allowed: false });
-  usedTrialIPs.add(ip);
-  console.log(`Trial granted to IP: ${ip}`);
-  return res.json({ allowed: true });
-});
-
-// ── Fetch helpers ──
-function fetchText(url) {
+// ── B2 S3-compatible helpers ──
+function b2Request(method, key, body, contentType) {
   return new Promise((resolve, reject) => {
-    const mod = url.startsWith('https') ? https : http;
-    mod.get(url, { headers: { 'User-Agent': 'VioraAI/1.0' } }, (res) => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => resolve(data.trim()));
-    }).on('error', reject);
-  });
-}
+    if (!B2_ENDPOINT || !B2_BUCKET_NAME || !B2_KEY_ID || !B2_APP_KEY)
+      return reject(new Error('B2 not configured'));
 
-function fetchJSON(url) {
-  return new Promise((resolve, reject) => {
-    const mod = url.startsWith('https') ? https : http;
-    mod.get(url, { headers: { 'User-Agent': 'VioraAI/1.0' } }, (res) => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
-    }).on('error', reject);
-  });
-}
+    const endpoint = B2_ENDPOINT.replace(/^https?:\/\//, '');
+    const bodyBuf  = body ? Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)) : Buffer.alloc(0);
+    const now      = new Date();
+    const dateStamp = now.toISOString().slice(0,10).replace(/-/g,'');
+    const amzDate   = now.toISOString().replace(/[:\-]|\.\d{3}/g,'').slice(0,15)+'Z';
+    const region    = B2_ENDPOINT.match(/s3\.([^.]+)\.backblaze/)?.[1] || 'us-east-005';
+    const fullPath  = `/${B2_BUCKET_NAME}/${key}`;
+    const ct        = contentType || 'application/json';
 
-// ── Reverse geocode lat/lon → city name ──
-async function reverseGeocode(lat, lon) {
-  try {
-    const data = await fetchJSON(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-    if (data?.address) {
-      const city = data.address.city || data.address.town || data.address.village || data.address.county || '';
-      const country = data.address.country || '';
-      return { city, country };
-    }
-  } catch (e) {
-    console.error('Geocode failed:', e.message);
-  }
-  return null;
-}
-
-// ── Get weather from coords ──
-async function getWeatherFromCoords(lat, lon) {
-  try {
-    // wttr.in supports lat,lon directly
-    const weather = await fetchText(`https://wttr.in/${lat},${lon}?format=3`);
-    return weather;
-  } catch (e) {
-    console.error('Weather fetch failed:', e.message);
-    return null;
-  }
-}
-
-// ── OpenRouter call ──
-function callOpenRouter(allMessages) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({
-      model: 'openrouter/auto',
-      messages: allMessages
-    });
+    const canonicalHeaders = `content-type:${ct}\nhost:${endpoint}\nx-amz-content-sha256:UNSIGNED-PAYLOAD\nx-amz-date:${amzDate}\n`;
+    const signedHeaders    = 'content-type;host;x-amz-content-sha256;x-amz-date';
+    const canonicalRequest = `${method}\n${fullPath}\n\n${canonicalHeaders}\n${signedHeaders}\nUNSIGNED-PAYLOAD`;
+    const credScope  = `${dateStamp}/${region}/s3/aws4_request`;
+    const strToSign  = `AWS4-HMAC-SHA256\n${amzDate}\n${credScope}\n${crypto.createHash('sha256').update(canonicalRequest).digest('hex')}`;
+    const kDate    = crypto.createHmac('sha256',`AWS4${B2_APP_KEY}`).update(dateStamp).digest();
+    const kRegion  = crypto.createHmac('sha256',kDate).update(region).digest();
+    const kService = crypto.createHmac('sha256',kRegion).update('s3').digest();
+    const kSign    = crypto.createHmac('sha256',kService).update('aws4_request').digest();
+    const sig      = crypto.createHmac('sha256',kSign).update(strToSign).digest('hex');
+    const auth = `AWS4-HMAC-SHA256 Credential=${B2_KEY_ID}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${sig}`;
 
     const options = {
-      hostname: 'openrouter.ai',
-      path: '/api/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://ai-1x5q.onrender.com',
-        'X-Title': 'Viora AI',
-        'Content-Length': Buffer.byteLength(payload)
-      }
+      hostname: endpoint, path: fullPath, method,
+      headers: { 'Content-Type':ct,'Content-Length':bodyBuf.length,'x-amz-date':amzDate,'x-amz-content-sha256':'UNSIGNED-PAYLOAD','Authorization':auth }
     };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) reject({ message: parsed.error.message });
-          else resolve(parsed.choices?.[0]?.message?.content || '');
-        } catch (e) { reject({ message: 'Parse error' }); }
-      });
+    const req = https.request(options, res => {
+      let data=''; res.on('data',c=>data+=c); res.on('end',()=>resolve({status:res.statusCode,body:data}));
     });
-
-    req.on('error', err => reject({ message: err.message }));
-    req.write(payload);
+    req.on('error', reject);
+    if (bodyBuf.length > 0) req.write(bodyBuf);
     req.end();
   });
 }
 
-// ── Main chat endpoint ──
-app.post('/api/chat', async (req, res) => {
-  const { messages, system, coords } = req.body;
+async function b2Get(key) {
+  try { const r=await b2Request('GET',key,null,'application/json'); if(r.status===200) return JSON.parse(r.body); return null; } catch { return null; }
+}
+async function b2Put(key, data) {
+  try { await b2Request('PUT',key,JSON.stringify(data),'application/json'); return true; } catch(e){ console.error('B2 put:',e.message); return false; }
+}
+async function b2Delete(key) {
+  try { await b2Request('DELETE',key,null,'application/json'); return true; } catch { return false; }
+}
+const emailToKey = email => crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
 
-  if (!OPENROUTER_API_KEY) {
-    return res.status(500).json({ error: 'OPENROUTER_API_KEY not set on server.' });
+// ── User index helpers ──
+async function getUserIndex() { return (await b2Get('users/index.json')) || []; }
+async function saveUserIndex(index) { return b2Put('users/index.json', index); }
+
+// ── Admin middleware ──
+function adminAuth(req, res, next) {
+  const auth = req.headers['x-admin-token'];
+  if (auth !== Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64')) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+  next();
+}
 
-  let weatherContext = '';
-
-  // If browser sent GPS coords, fetch real weather
-  if (coords && coords.lat && coords.lon) {
-    console.log(`GPS coords received: ${coords.lat}, ${coords.lon}`);
-
-    const [place, weather] = await Promise.all([
-      reverseGeocode(coords.lat, coords.lon),
-      getWeatherFromCoords(coords.lat, coords.lon)
-    ]);
-
-    if (weather) {
-      const locationName = place ? `${place.city}, ${place.country}` : `${coords.lat}, ${coords.lon}`;
-      weatherContext = `\n\n[LIVE WEATHER (from user's GPS — ${locationName}): ${weather}. Use this data to answer their weather question accurately.]`;
-      console.log(`Weather injected for ${locationName}: ${weather}`);
-    }
-  }
-
-  const systemPrompt = (system || 'You are Viora, a friendly, warm and helpful AI assistant. Be clear, concise and encouraging.') + weatherContext;
-
-  const allMessages = [
-    { role: 'system', content: systemPrompt },
-    ...messages
-  ];
-
-  try {
-    const text = await callOpenRouter(allMessages);
-    res.json({ content: [{ text }] });
-  } catch (err) {
-    console.error('OpenRouter error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+// ── Auth API ──
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name || !email || !password || password.length < 6)
+    return res.status(400).json({ error: 'Invalid fields' });
+  const key = `users/${emailToKey(email)}.json`;
+  if (await b2Get(key)) return res.status(409).json({ error: 'Email already registered' });
+  const hash = crypto.createHash('sha256').update(password).digest('hex');
+  const userData = { name, email: email.toLowerCase(), password: hash, createdAt: new Date().toISOString() };
+  await b2Put(key, userData);
+  // Add to user index
+  const index = await getUserIndex();
+  index.push({ name, email: email.toLowerCase(), createdAt: userData.createdAt });
+  await saveUserIndex(index);
+  res.json({ success: true, name });
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'templates', 'index.html'));
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
+  const user = await b2Get(`users/${emailToKey(email)}.json`);
+  if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+  if (user.password !== crypto.createHash('sha256').update(password).digest('hex'))
+    return res.status(401).json({ error: 'Invalid email or password' });
+  res.json({ success: true, name: user.name, email: user.email });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// ── Admin login ──
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    const token = Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
+    return res.json({ success: true, token });
+  }
+  res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// ── Admin: list users ──
+app.get('/api/admin/users', adminAuth, async (req, res) => {
+  const index = await getUserIndex();
+  res.json(index);
+});
+
+// ── Admin: delete user ──
+app.delete('/api/admin/users/:email', adminAuth, async (req, res) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase();
+  const eKey  = emailToKey(email);
+  // Delete user file
+  await b2Delete(`users/${eKey}.json`);
+  // Delete chat index + files would be ideal but skip for now
+  await b2Delete(`chats/${eKey}/index.json`);
+  // Remove from user index
+  let index = await getUserIndex();
+  index = index.filter(u => u.email !== email);
+  await saveUserIndex(index);
+  res.json({ success: true });
+});
+
+// ── Admin: send popup ──
+app.post('/api/admin/popup', adminAuth, (req, res) => {
+  const { message, type } = req.body; // type: info | warning | success | error
+  if (!message) return res.status(400).json({ error: 'Message required' });
+  activePopup = { message, type: type || 'info', id: Date.now(), createdAt: new Date().toISOString() };
+  console.log('Admin popup set:', activePopup.message);
+  res.json({ success: true });
+});
+
+// ── Admin: clear popup ──
+app.delete('/api/admin/popup', adminAuth, (req, res) => {
+  activePopup = null;
+  res.json({ success: true });
+});
+
+// ── Admin: stats ──
+app.get('/api/admin/stats', adminAuth, async (req, res) => {
+  const index = await getUserIndex();
+  res.json({ totalUsers: index.length, activePopup, trialIPCount: usedTrialIPs.size });
+});
+
+// ── User: poll for popup ──
+app.get('/api/popup', (req, res) => {
+  res.json(activePopup || null);
+});
+
+// ── Serve admin page ──
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'templates', 'admin.html')));
+
+// ── Trial ──
+app.post('/api/trial-start', (req, res) => {
+  const ip = getClientIP(req);
+  if (usedTrialIPs.has(ip)) return res.json({ allowed: false });
+  usedTrialIPs.add(ip);
+  return res.json({ allowed: true });
+});
+
+// ── Chat history API ──
+async function getChatIndex(email) { return (await b2Get(`chats/${emailToKey(email)}/index.json`)) || []; }
+async function saveChatIndex(email, index) { return b2Put(`chats/${emailToKey(email)}/index.json`, index); }
+
+app.get('/api/chats', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  res.json(await getChatIndex(email));
+});
+
+app.post('/api/chats', async (req, res) => {
+  const { email, chatId, title, messages } = req.body;
+  if (!email || !chatId || !messages) return res.status(400).json({ error: 'Missing fields' });
+  await b2Put(`chats/${emailToKey(email)}/${chatId}.json`, { id:chatId, title, messages, updatedAt: new Date().toISOString() });
+  let index = await getChatIndex(email);
+  const entry = { id:chatId, title, date: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), updatedAt: new Date().toISOString() };
+  const idx = index.findIndex(c=>c.id===chatId);
+  if (idx>=0) index[idx]=entry; else index.unshift(entry);
+  await saveChatIndex(email, index);
+  res.json({ success: true });
+});
+
+app.get('/api/chats/:chatId', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  const chat = await b2Get(`chats/${emailToKey(email)}/${req.params.chatId}.json`);
+  if (!chat) return res.status(404).json({ error: 'Not found' });
+  res.json(chat);
+});
+
+app.delete('/api/chats/:chatId', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  await b2Delete(`chats/${emailToKey(email)}/${req.params.chatId}.json`);
+  let index = await getChatIndex(email);
+  index = index.filter(c=>c.id!==req.params.chatId);
+  await saveChatIndex(email, index);
+  res.json({ success: true });
+});
+
+// ── Fetch helpers ──
+function fetchText(url) {
+  return new Promise((resolve,reject)=>{ const mod=url.startsWith('https')?https:http; mod.get(url,{headers:{'User-Agent':'VioraAI/1.0'}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>resolve(d.trim()));}).on('error',reject); });
+}
+function fetchJSON(url) {
+  return new Promise((resolve,reject)=>{ const mod=url.startsWith('https')?https:http; mod.get(url,{headers:{'User-Agent':'VioraAI/1.0'}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{resolve(JSON.parse(d))}catch{resolve(null)}});}).on('error',reject); });
+}
+async function reverseGeocode(lat,lon) {
+  try { const d=await fetchJSON(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`); if(d?.address) return {city:d.address.city||d.address.town||d.address.village||'',country:d.address.country||''}; } catch{} return null;
+}
+async function getWeatherFromCoords(lat,lon) {
+  try { return await fetchText(`https://wttr.in/${lat},${lon}?format=3`); } catch { return null; }
+}
+
+// ── OpenRouter ──
+function callOpenRouter(allMessages) {
+  return new Promise((resolve,reject)=>{
+    const payload=JSON.stringify({model:'openrouter/auto',messages:allMessages});
+    const options={hostname:'openrouter.ai',path:'/api/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${OPENROUTER_API_KEY}`,'HTTP-Referer':'https://ai-1x5q.onrender.com','X-Title':'Viora AI','Content-Length':Buffer.byteLength(payload)}};
+    const req=https.request(options,res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const p=JSON.parse(d);if(p.error)reject({message:p.error.message});else resolve(p.choices?.[0]?.message?.content||'');}catch{reject({message:'Parse error'})}});});
+    req.on('error',err=>reject({message:err.message}));
+    req.write(payload);req.end();
+  });
+}
+
+app.post('/api/chat', async (req,res)=>{
+  const {messages,system,coords}=req.body;
+  if (!OPENROUTER_API_KEY) return res.status(500).json({error:'OPENROUTER_API_KEY not set.'});
+  let weatherCtx='';
+  if (coords?.lat&&coords?.lon) {
+    const [place,weather]=await Promise.all([reverseGeocode(coords.lat,coords.lon),getWeatherFromCoords(coords.lat,coords.lon)]);
+    if (weather) { const loc=place?`${place.city}, ${place.country}`:`${coords.lat},${coords.lon}`; weatherCtx=`\n\n[LIVE WEATHER (${loc}): ${weather}]`; }
+  }
+  const allMessages=[{role:'system',content:(system||'You are Viora, a friendly helpful AI.')+weatherCtx},...messages];
+  try { const text=await callOpenRouter(allMessages); res.json({content:[{text}]}); }
+  catch(err){ res.status(500).json({error:err.message}); }
+});
+
+app.get('/', (req,res) => res.sendFile(path.join(__dirname,'templates','index.html')));
+const PORT = process.env.PORT||3000;
+app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));

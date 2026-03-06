@@ -1391,16 +1391,16 @@ async function sendMessage() {
         .trim();
 
       // Enhance prompt for photorealistic quality
-      const enhancedPrompt = cleanPrompt + ', highly detailed, photorealistic, 8k, professional photography, beautiful lighting, sharp focus';
-      const encodedPrompt = encodeURIComponent(enhancedPrompt);
+      const enhancedPrompt = cleanPrompt + ', highly detailed, photorealistic, 8k, beautiful lighting, sharp focus, professional';
       const seed = Math.floor(Math.random() * 999999);
-      const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
+      // Use backend proxy to avoid CORS/blocking
+      const imgUrl = `/api/genimage?prompt=${encodeURIComponent(enhancedPrompt)}&seed=${seed}`;
 
-      // Show loading state with progress feel
+      // Show loading state
       typingEl.classList.remove('show');
       addGeneratingMsg();
 
-      // Preload image
+      // Preload via proxy
       const img = new Image();
       img.onload = async () => {
         removeGeneratingMsg();
@@ -1412,14 +1412,30 @@ async function sendMessage() {
         busy = false;
         inputEl.focus();
       };
-      img.onerror = () => {
+      img.onerror = async () => {
         removeGeneratingMsg();
-        addMsg('ai', '⚠️ Image generation failed. Please try again.');
-        busy = false;
-        inputEl.focus();
+        // Fallback: try direct URL
+        const directUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
+        const img2 = new Image();
+        img2.crossOrigin = 'anonymous';
+        img2.onload = async () => {
+          addRealImageMsg(text, directUrl);
+          history.push({ role: 'assistant', content: '[Generated image for: "' + text + '"]' });
+          await saveChatIfNeeded();
+          const session = getSession();
+          if (session?.email) renderHistory(session.email);
+          busy = false;
+          inputEl.focus();
+        };
+        img2.onerror = () => {
+          addMsg('ai', '⚠️ Image generation failed. Please try again in a moment.');
+          busy = false;
+          inputEl.focus();
+        };
+        img2.src = directUrl;
       };
       img.src = imgUrl;
-      return; // don't set busy=false yet, handled in onload/onerror
+      return;
     } catch (err) {
       typingEl.classList.remove('show');
       addMsg('ai', '⚠️ Image error: ' + err.message);

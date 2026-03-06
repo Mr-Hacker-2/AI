@@ -1423,7 +1423,8 @@ async function sendMessage() {
 
       const enhancedPrompt = cleanPrompt + ', highly detailed, photorealistic, 8k, beautiful lighting, sharp focus';
       const seed = Math.floor(Math.random() * 999999);
-      const imgUrl = `/api/genimage?prompt=${encodeURIComponent(enhancedPrompt)}&seed=${seed}`;
+      // Call Pollinations directly from the browser (no server proxy needed)
+      const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&model=flux-schnell&nologo=true&enhance=true`;
 
       typingEl.classList.remove('show');
       addGeneratingMsg();
@@ -1437,7 +1438,7 @@ async function sendMessage() {
         if (session?.email) renderHistory(session.email);
         busy = false;
         inputEl.focus();
-      }, 1200);
+      }, 300);
       return;
     } catch (err) {
       typingEl.classList.remove('show');

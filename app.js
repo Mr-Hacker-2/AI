@@ -252,6 +252,26 @@ async function reverseGeocode(lat,lon) {
 async function getWeatherFromCoords(lat,lon) {
   try { return await fetchText(`https://wttr.in/${lat},${lon}?format=3`); } catch { return null; }
 }
+async function getWeatherRich(lat,lon) {
+  try {
+    const raw = await fetchText(`https://wttr.in/${lat},${lon}?format=j1`);
+    const d = JSON.parse(raw);
+    const cur = d.current_condition?.[0];
+    if (!cur) return null;
+    const weather = d.weather || [];
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const daily = weather.slice(0,7).map(day => {
+      const date = new Date(day.date);
+      return { day: days[date.getDay()], high: parseInt(day.maxtempF), low: parseInt(day.mintempF), code: parseInt(day.hourly?.[4]?.weatherCode || 113) };
+    });
+    return {
+      tempF: parseInt(cur.temp_F), feelsF: parseInt(cur.FeelsLikeF),
+      desc: cur.weatherDesc?.[0]?.value || '', humidity: parseInt(cur.humidity),
+      windMph: parseInt(cur.windspeedMiles), visibility: parseInt(cur.visibility),
+      uvIndex: parseInt(cur.uvIndex), code: parseInt(cur.weatherCode), daily
+    };
+  } catch(e) { return null; }
+}
 
 // ── OpenRouter ──
 function callOpenRouter(allMessages) {
@@ -412,6 +432,19 @@ Use clear headings, be comprehensive, accurate, and well-organized. Write at lea
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+
+app.get('/api/weather', async (req, res) => {
+  const { lat, lon } = req.query;
+  if (!lat || !lon) return res.status(400).json({ error: 'Missing coords' });
+  const [place, rich, simple] = await Promise.all([
+    reverseGeocode(parseFloat(lat), parseFloat(lon)),
+    getWeatherRich(parseFloat(lat), parseFloat(lon)),
+    getWeatherFromCoords(parseFloat(lat), parseFloat(lon))
+  ]);
+  if (!rich) return res.status(500).json({ error: 'Weather unavailable' });
+  res.json({ place, weather: rich });
 });
 
 

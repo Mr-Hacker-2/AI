@@ -550,7 +550,7 @@ header {
       <div class="sidebar-empty" id="history-empty">No chats yet.<br>Start a conversation!</div>
     </div>
     <div style="padding:0 0 4px;">
-      <button class="btn-other-ais" onclick="openAiModal()">✍️ AI Humanizer</button>
+      <button class="btn-other-ais" onclick="openAiModal()">🤖 View other AIs</button>
     </div>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -1060,7 +1060,7 @@ let humStyle = 'Casual';
 
 function openAiModal(tab) {
   document.getElementById('ai-modal').classList.add('show');
-  switchAimTab(tab || 'ais');
+  switchAimTab(tab || 'tools');
 }
 function closeAiModal() {
   document.getElementById('ai-modal').classList.remove('show');
@@ -1069,7 +1069,8 @@ function switchAimTab(tab) {
   aimCurrentTab = tab;
   document.querySelectorAll('.aim-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.aim-panel').forEach(p => p.classList.remove('show'));
-  document.getElementById('aim-tab-' + tab).classList.add('active');
+  const tabEl = document.getElementById('aim-tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
   document.getElementById('aim-panel-' + tab).classList.add('show');
 }
 function selectHumOpt(btn) {
@@ -1633,13 +1634,36 @@ function closeAdminPopup() {
 <div id="ai-modal">
   <div class="aim-card">
     <div class="aim-head">
-      <div class="aim-title">✍️ AI Humanizer</div>
+      <div class="aim-title">🤖 Our AI Tools</div>
       <button class="aim-close" onclick="closeAiModal()">✕</button>
     </div>
 
+    <div class="aim-tabs">
+      <button class="aim-tab active" id="aim-tab-tools" onclick="switchAimTab('tools')">🤖 Tools</button>
+      <button class="aim-tab" id="aim-tab-humanizer" onclick="switchAimTab('humanizer')">✍️ Humanizer</button>
+    </div>
     <div class="aim-body">
 
-      <div class="aim-panel show" id="aim-panel-humanizer">
+      <!-- TOOLS GRID -->
+      <div id="aim-panel-tools" class="aim-panel show">
+        <p style="font-size:.78rem;color:var(--text-mid);margin:0 0 14px;">Viora-powered tools — more coming soon.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="other-ai-card" onclick="switchAimTab('humanizer')" style="cursor:pointer;">
+            <div class="oac-logo" style="background:rgba(124,58,237,.12)">✍️</div>
+            <div class="oac-name">AI Humanizer</div>
+            <div class="oac-desc">Make AI-written text sound natural and human.</div>
+            <span class="oac-tag" style="background:rgba(124,58,237,.1);color:var(--violet-light);">Free · Viora</span>
+          </div>
+          <div class="other-ai-card" style="opacity:.5;cursor:default;">
+            <div class="oac-logo" style="background:rgba(124,58,237,.08)">🔜</div>
+            <div class="oac-name">Coming Soon</div>
+            <div class="oac-desc">More Viora tools are on the way.</div>
+            <span class="oac-tag" style="background:rgba(124,58,237,.06);color:var(--text-mid);">Soon</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="aim-panel" id="aim-panel-humanizer">
         <div class="hum-wrap">
           <div>
             <div class="hum-label">Paste AI-generated text to humanize</div>

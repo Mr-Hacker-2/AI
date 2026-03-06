@@ -435,6 +435,29 @@ Use clear headings, be comprehensive, accurate, and well-organized. Write at lea
 });
 
 
+// ── Dedicated image gen route (higher token limit) ──
+app.post('/api/imagegen', async (req, res) => {
+  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OPENROUTER_API_KEY not set.' });
+  const { system, messages } = req.body;
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({ model: 'openrouter/auto', max_tokens: 8000, messages: [{ role: 'system', content: system }, ...messages] });
+    const options = { hostname: 'openrouter.ai', path: '/api/v1/chat/completions', method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}`, 'HTTP-Referer': 'https://ai-1x5q.onrender.com', 'X-Title': 'Viora AI', 'Content-Length': Buffer.byteLength(payload) } };
+    const r = https.request(options, resp => {
+      let d = ''; resp.on('data', c => d += c);
+      resp.on('end', () => {
+        try {
+          const p = JSON.parse(d);
+          if (p.error) { res.status(500).json({ error: p.error.message }); resolve(); }
+          else { res.json({ content: [{ text: p.choices?.[0]?.message?.content || '' }] }); resolve(); }
+        } catch { res.status(500).json({ error: 'Parse error' }); resolve(); }
+      });
+    });
+    r.on('error', err => { res.status(500).json({ error: err.message }); resolve(); });
+    r.write(payload); r.end();
+  });
+});
+
+
 app.get('/api/weather', async (req, res) => {
   const { lat, lon } = req.query;
   if (!lat || !lon) return res.status(400).json({ error: 'Missing coords' });

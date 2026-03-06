@@ -550,7 +550,7 @@ header {
       <div class="sidebar-empty" id="history-empty">No chats yet.<br>Start a conversation!</div>
     </div>
     <div style="padding:0 0 4px;">
-      <button class="btn-other-ais" onclick="openAiModal()">🤖 View other AIs</button>
+      <button class="btn-other-ais" onclick="openAiModal()">✍️ AI Humanizer</button>
     </div>
     <div class="sidebar-footer">
       <div class="sidebar-user">
@@ -1556,59 +1556,13 @@ function closeAdminPopup() {
 <div id="ai-modal">
   <div class="aim-card">
     <div class="aim-head">
-      <div class="aim-title">🤖 AI Tools</div>
+      <div class="aim-title">✍️ AI Humanizer</div>
       <button class="aim-close" onclick="closeAiModal()">✕</button>
     </div>
-    <div class="aim-tabs">
-      <button class="aim-tab active" id="aim-tab-ais" onclick="switchAimTab('ais')">Other AIs</button>
-      <button class="aim-tab" id="aim-tab-humanizer" onclick="switchAimTab('humanizer')">✍️ AI Humanizer</button>
-    </div>
+
     <div class="aim-body">
 
-      <!-- OTHER AIs PANEL -->
-      <div class="aim-panel show" id="aim-panel-ais">
-        <div class="other-ais-grid">
-          <a class="other-ai-card" href="https://chat.openai.com" target="_blank" rel="noopener">
-            <div class="oac-logo" style="background:#10a37f1a">🟢</div>
-            <div class="oac-name">ChatGPT</div>
-            <div class="oac-desc">OpenAI's flagship AI — great for writing, coding and reasoning.</div>
-            <span class="oac-tag" style="background:#10a37f1a;color:#10a37f">openai.com</span>
-          </a>
-          <a class="other-ai-card" href="https://gemini.google.com" target="_blank" rel="noopener">
-            <div class="oac-logo" style="background:#4285f41a">🔵</div>
-            <div class="oac-name">Gemini</div>
-            <div class="oac-desc">Google's AI — integrates with Google Workspace and search.</div>
-            <span class="oac-tag" style="background:#4285f41a;color:#4285f4">google.com</span>
-          </a>
-          <a class="other-ai-card" href="https://claude.ai" target="_blank" rel="noopener">
-            <div class="oac-logo" style="background:#d97c301a">🟠</div>
-            <div class="oac-name">Claude</div>
-            <div class="oac-desc">Anthropic's AI — known for nuanced writing and safety.</div>
-            <span class="oac-tag" style="background:#d97c301a;color:#d97c30">anthropic.com</span>
-          </a>
-          <a class="other-ai-card" href="https://copilot.microsoft.com" target="_blank" rel="noopener">
-            <div class="oac-logo" style="background:#0078d41a">🔷</div>
-            <div class="oac-name">Copilot</div>
-            <div class="oac-desc">Microsoft's AI — built into Windows and Office 365.</div>
-            <span class="oac-tag" style="background:#0078d41a;color:#0078d4">microsoft.com</span>
-          </a>
-          <a class="other-ai-card" href="https://www.perplexity.ai" target="_blank" rel="noopener">
-            <div class="oac-logo" style="background:#20b2aa1a">🔍</div>
-            <div class="oac-name">Perplexity</div>
-            <div class="oac-desc">AI-powered search engine with real-time web citations.</div>
-            <span class="oac-tag" style="background:#20b2aa1a;color:#20b2aa">perplexity.ai</span>
-          </a>
-          <a class="other-ai-card" href="https://grok.com" target="_blank" rel="noopener">
-            <div class="oac-logo" style="background:#1da1f21a">⚡</div>
-            <div class="oac-name">Grok</div>
-            <div class="oac-desc">xAI's model — real-time X/Twitter data access and wit.</div>
-            <span class="oac-tag" style="background:#1da1f21a;color:#1da1f2">x.ai</span>
-          </a>
-        </div>
-      </div>
-
-      <!-- HUMANIZER PANEL -->
-      <div class="aim-panel" id="aim-panel-humanizer">
+      <div class="aim-panel show" id="aim-panel-humanizer">
         <div class="hum-wrap">
           <div>
             <div class="hum-label">Paste AI-generated text to humanize</div>

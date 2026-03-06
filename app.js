@@ -458,6 +458,34 @@ app.post('/api/imagegen', async (req, res) => {
 });
 
 
+// ── Image generation proxy (Pollinations.ai via server) ──
+app.get('/api/genimage', async (req, res) => {
+  const prompt = req.query.prompt;
+  const seed = req.query.seed || Math.floor(Math.random() * 999999);
+  if (!prompt) return res.status(400).json({ error: 'No prompt' });
+
+  const encodedPrompt = encodeURIComponent(prompt);
+  const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
+
+  return new Promise((resolve) => {
+    const https = require('https');
+    https.get(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (imgRes) => {
+      if (imgRes.statusCode !== 200) {
+        res.status(500).json({ error: `Upstream ${imgRes.statusCode}` });
+        return resolve();
+      }
+      res.setHeader('Content-Type', imgRes.headers['content-type'] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      imgRes.pipe(res);
+      imgRes.on('end', resolve);
+    }).on('error', (err) => {
+      res.status(500).json({ error: err.message });
+      resolve();
+    });
+  });
+});
+
+
 app.get('/api/weather', async (req, res) => {
   const { lat, lon } = req.query;
   if (!lat || !lon) return res.status(400).json({ error: 'Missing coords' });

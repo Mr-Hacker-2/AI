@@ -1094,10 +1094,25 @@ function addRealImageMsg(prompt, url) {
   const imgEl = document.createElement('img');
   imgEl.alt = safePrompt;
   imgEl.style.cssText = 'width:100%;border-radius:14px;display:none;cursor:pointer;box-shadow:0 4px 24px rgba(0,0,0,.12);';
+  let imgRetries = 0;
+  const fallbackUrls = [
+    url,
+    url.replace('model=flux', 'model=flux-schnell'),
+    url.replace('model=flux', 'model=turbo').replace('1024&height=1024', '512&height=512'),
+  ];
   imgEl.onload = () => { skeleton.remove(); imgEl.style.display = 'block'; scrollBot(); };
-  imgEl.onerror = () => { skeleton.style.background = 'var(--surface)'; skeleton.style.animation = 'none'; skeleton.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-light);font-size:.8rem;flex-direction:column;gap:8px;padding:40px 0;"><span style="font-size:2rem;">😕</span>Image failed to load.<br>Try a different prompt.</div>'; };
+  imgEl.onerror = () => {
+    imgRetries++;
+    if (imgRetries < fallbackUrls.length) {
+      setTimeout(() => { imgEl.src = fallbackUrls[imgRetries]; }, 2000);
+      skeleton.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:180px;color:var(--text-light);font-size:.78rem;flex-direction:column;gap:8px;"><span style="font-size:1.5rem;">⏳</span>Trying again…</div>';
+    } else {
+      skeleton.style.background = 'var(--surface)'; skeleton.style.animation = 'none';
+      skeleton.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-light);font-size:.8rem;flex-direction:column;gap:8px;padding:40px 0;"><span style="font-size:2rem;">😕</span>Image failed to load.<br>Try a different prompt.</div>';
+    }
+  };
   imgEl.onclick = () => openLightbox(url);
-  imgEl.src = url;
+  imgEl.src = fallbackUrls[0];
 
   const caption = document.createElement('div');
   caption.className = 'img-caption';
@@ -1424,7 +1439,7 @@ async function sendMessage() {
       const enhancedPrompt = cleanPrompt + ', highly detailed, photorealistic, 8k, beautiful lighting, sharp focus';
       const seed = Math.floor(Math.random() * 999999);
       // Call Pollinations directly from the browser (no server proxy needed)
-      const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&model=flux-schnell&nologo=true&enhance=true`;
+      const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true`;
 
       typingEl.classList.remove('show');
       addGeneratingMsg();

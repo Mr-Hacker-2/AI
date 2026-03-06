@@ -561,10 +561,14 @@ header {
 </div>
 
 <script>
-// ── Session (kept in sessionStorage) ──
+// ── Session (kept in localStorage for persistence across refreshes) ──
 const SESSION_KEY = 'viora_session';
-const getSession = () => { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
-const saveSession = s => sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+const CHAT_STATE_KEY = 'viora_chat_state';
+const getSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
+const saveSession = s => localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+const getChatState = () => { try { return JSON.parse(localStorage.getItem(CHAT_STATE_KEY) || 'null'); } catch { return null; } };
+const saveChatState = s => localStorage.setItem(CHAT_STATE_KEY, JSON.stringify(s));
+const clearChatState = () => localStorage.removeItem(CHAT_STATE_KEY);
 
 // ── State ──
 let currentChatId = null;
@@ -638,7 +642,8 @@ async function startTrial() {
 }
 
 function doLogout() {
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(CHAT_STATE_KEY);
   clearTimer();
   history = []; currentChatId = null;
   clearChatWindow();
@@ -673,7 +678,13 @@ function openChat(name, isTrial, email) {
     document.getElementById('header-logout-btn').style.display = 'none'; // sidebar has logout
     document.querySelector('.btn-toggle-sidebar').style.visibility = '';
     renderHistory(email);
-    startNewChat();
+    // Restore last chat on refresh
+    const savedChatId = localStorage.getItem(CHAT_STATE_KEY) ? JSON.parse(localStorage.getItem(CHAT_STATE_KEY))?.chatId : null;
+    if (savedChatId) {
+      loadChat(savedChatId);
+    } else {
+      startNewChat();
+    }
   }
 }
 
@@ -722,6 +733,7 @@ function newChat() {
 
 function startNewChat() {
   currentChatId = 'chat_' + Date.now();
+  localStorage.removeItem(CHAT_STATE_KEY);
   history = [];
   clearChatWindow();
   document.getElementById('welcome').style.display = '';
@@ -741,6 +753,8 @@ async function saveChatIfNeeded() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: session.email, chatId: currentChatId, title, messages: history })
     });
+    // Persist current chat id so refresh restores it
+    saveChatState({ chatId: currentChatId });
   } catch (e) { console.warn('Save chat failed:', e); }
 }
 
@@ -753,6 +767,7 @@ async function loadChat(id) {
     if (!res.ok) return;
     const chat = await res.json();
     currentChatId = id;
+    localStorage.setItem(CHAT_STATE_KEY, JSON.stringify({ chatId: id }));
     history = [...chat.messages];
     clearChatWindow();
     document.getElementById('welcome').style.display = 'none';
@@ -1226,9 +1241,16 @@ async function clearAllMemories() {
   } catch {}
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   const s = getSession();
-  if (s) { openChat(s.name, s.isTrial, s.email || null); checkAdminPopup(); }
+  if (s) {
+    openChat(s.name, s.isTrial, s.email || null);
+    checkAdminPopup();
+    // Restore last active chat on refresh
+    if (s.email && !s.isTrial) {
+      // handled in openChat now via localStorage
+    }
+  }
 });
 
 // ── Admin popup check ──

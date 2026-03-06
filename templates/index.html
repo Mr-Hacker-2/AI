@@ -989,25 +989,45 @@ function addCodeImageMsg(prompt, svgCode) {
 
   // Render SVG into canvas for PNG download
   const canvas = document.createElement('canvas');
-  canvas.width = 512; canvas.height = 512;
-  canvas.style.cssText = 'width:100%;border-radius:14px;display:block;cursor:pointer;';
+  canvas.width = 800; canvas.height = 800;
+  canvas.style.cssText = 'width:100%;border-radius:14px;display:block;cursor:pointer;image-rendering:high-quality;';
   canvas.title = 'Click to enlarge';
 
-  const img = new Image();
+  // Use high-DPI rendering
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = 800 * dpr;
+  canvas.height = 800 * dpr;
+  canvas.style.width = '100%';
+  canvas.style.height = 'auto';
+
   const svgBlob = new Blob([svgCode], {type:'image/svg+xml;charset=utf-8'});
   const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
   img.onload = () => {
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, 512, 512);
+    ctx.scale(dpr, dpr);
+    ctx.drawImage(img, 0, 0, 800, 800);
     URL.revokeObjectURL(url);
+  };
+  img.onerror = () => {
+    // Fallback: render SVG directly in an img tag
+    canvas.style.display = 'none';
+    const fallback = document.createElement('img');
+    fallback.src = url;
+    fallback.style.cssText = 'width:100%;border-radius:14px;display:block;cursor:pointer;';
+    fallback.onclick = () => openLightbox(url);
+    bubble.insertBefore(fallback, canvas);
   };
   img.src = url;
 
   canvas.addEventListener('click', () => {
-    const lb = document.getElementById('img-lightbox');
-    const lbImg = document.getElementById('lightbox-img');
-    lbImg.src = canvas.toDataURL('image/png');
-    lb.classList.add('show');
+    // Wait for image to be fully rendered
+    setTimeout(() => {
+      const lb = document.getElementById('img-lightbox');
+      const lbImg = document.getElementById('lightbox-img');
+      lbImg.src = canvas.toDataURL('image/png');
+      lb.classList.add('show');
+    }, 100);
   });
 
   const caption = document.createElement('div');
@@ -1316,39 +1336,60 @@ async function sendMessage() {
     return;
   }
 
-  // ── Image generation (code-rendered) ──
+  // ── Image generation (code-rendered SVG) ──
   if (isImageRequest(text)) {
     try {
-      const res = await fetch('/api/chat', {
+      const cleanPrompt = text.replace(/^(draw|generate|create|make|paint|show|imagine|design|render|sketch|illustrate|produce|can you|please|could you)\s+(me\s+)?(a|an|the|some)?\s*/i, '').trim();
+
+      const res = await fetch('/api/imagegen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: `You are an expert SVG artist. When given an image prompt, respond with ONLY a complete, self-contained SVG that visually represents the prompt. Requirements:
-- Output ONLY the raw SVG code, nothing else — no explanation, no markdown, no backticks
-- Start with <svg and end with </svg>
-- Use viewBox="0 0 512 512" width="512" height="512"
-- Make it visually rich, colorful, detailed and beautiful
-- Use gradients, patterns, shapes, paths creatively
-- No external images or fonts`,
-          messages: [{ role: 'user', content: text }],
+          system: `You are a world-class SVG illustrator. Your SVGs are stunning, detailed, and photorealistic in style despite being vector art.
+
+STRICT RULES:
+1. Output ONLY raw SVG. No explanation, no markdown, no backticks, no comments outside SVG.
+2. Always start with exactly: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+3. End with exactly: </svg>
+4. Use ALL of these techniques to maximize quality:
+   - Multiple layered <defs> with linearGradient, radialGradient, filter (blur, shadow, glow, noise)
+   - Complex paths with bezier curves for organic shapes
+   - Realistic lighting: highlights (white overlay, low opacity), shadows (dark overlay)
+   - Depth through overlapping layers, atmospheric perspective
+   - Rich color palettes — no flat colors, always use gradients
+   - Fine details: texture, patterns, subtle noise via feTurbulence
+   - Smooth animations with <animate> or <animateTransform> where fitting (stars twinkling, water rippling, etc.)
+5. Fill the entire 800x800 canvas — background to foreground
+6. Think like a painter: sky/bg first, mid-ground, foreground, details, highlights last
+7. Make it BEAUTIFUL. This is art.`,
+          messages: [{ role: 'user', content: `Create a stunning, highly detailed SVG illustration of: ${cleanPrompt}
+
+Think carefully about:
+- What colors, lighting, and mood best suit this subject
+- How to create depth and realism with SVG gradients and filters
+- What foreground, mid-ground, and background elements to include
+- Any subtle animations that would bring it to life` }],
           email: getSession()?.email || null
         })
       });
+
       const data = await res.json();
       typingEl.classList.remove('show');
+
       if (data.error) {
         addMsg('ai', '⚠️ Image error: ' + data.error);
       } else {
-        const svgCode = data.content?.[0]?.text || '';
-        const cleaned = svgCode.trim().replace(/^```[a-z]*\n?/i,'').replace(/```$/,'').trim();
-        if (cleaned.startsWith('<svg')) {
-          addCodeImageMsg(text, cleaned);
-          history.push({ role: 'assistant', content: `[Generated image for: "${text}"]` });
+        let svgCode = data.content?.[0]?.text || '';
+        // Strip any markdown fences or preamble
+        svgCode = svgCode.replace(/^[\s\S]*?(<svg)/i, '$1').replace(/<\/svg>[\s\S]*$/, '</svg>').trim();
+        if (svgCode.startsWith('<svg')) {
+          addCodeImageMsg(text, svgCode);
+          history.push({ role: 'assistant', content: '[Generated image for: "' + text + '"]' });
           await saveChatIfNeeded();
           const session = getSession();
           if (session?.email) renderHistory(session.email);
         } else {
-          addMsg('ai', cleaned);
+          addMsg('ai', '⚠️ Could not generate image. Try rephrasing your prompt.');
         }
       }
     } catch (err) {

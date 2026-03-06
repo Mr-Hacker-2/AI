@@ -1018,20 +1018,33 @@ inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey)
 
 function scrollBot() { chatEl.scrollTop = chatEl.scrollHeight; }
 
+function renderMarkdown(text) {
+  // Simple markdown: bold, italic, code blocks, inline code, line breaks
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```([\s\S]*?)```/g, '<pre style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;overflow-x:auto;font-size:.83rem;margin:6px 0;"><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:.85em;">$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
 function addMsg(role, text) {
   const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const d = document.createElement('div');
   d.className = `msg ${role}`;
   const session = getSession();
   const initials = session?.name ? session.name[0].toUpperCase() : 'U';
+  const bubbleContent = role === 'ai' ? renderMarkdown(text) : escHtml(text);
   d.innerHTML = `
     <div class="av">${role === 'ai' ? 'V' : initials}</div>
     <div class="bubble-wrap">
-      <div class="bubble">${escHtml(text)}</div>
+      <div class="bubble">${bubbleContent}</div>
       <div class="msg-time">${now}</div>
     </div>`;
   chatEl.insertBefore(d, typingEl);
   scrollBot();
+  return d;
 }
 
 function escHtml(t) {
@@ -1499,15 +1512,46 @@ async function sendMessage() {
       })
     });
 
-    const data = await res.json();
     typingEl.classList.remove('show');
 
-    if (data.error) {
-      addMsg('ai', '⚠️ ' + data.error);
-    } else {
-      const reply = data.content?.[0]?.text || 'Hmm, no response. Try again!';
-      addMsg('ai', reply);
-      history.push({ role: 'assistant', content: reply });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      addMsg('ai', '⚠️ ' + (err.error || 'Request failed'));
+      busy = false; inputEl.focus(); return;
+    }
+
+    // Stream tokens into a live bubble
+    const msgDiv = addMsg('ai', '');
+    const bubbleEl = msgDiv ? msgDiv.querySelector('.bubble') : null;
+    let reply = '';
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.token) {
+            reply += parsed.token;
+            if (bubbleEl) { bubbleEl.innerHTML = renderMarkdown(reply); scrollBot(); }
+          }
+        } catch {}
+      }
+    }
+
+    if (!reply) reply = 'Hmm, no response. Try again!';
+    if (bubbleEl) bubbleEl.innerHTML = renderMarkdown(reply);
+    history.push({ role: 'assistant', content: reply });
       await saveChatIfNeeded();
       const session = getSession();
       if (session?.email) renderHistory(session.email);

@@ -41,6 +41,7 @@
         background: rgba(19, 16, 31, 0.96);
         border-color: #2d2640;
       }
+      /* Chat bubble selectors must match `.msg ... .bubble` structure used in templates/index.html */
       body.dark .msg.ai .bubble {
         background: #1a1625;
         border-color: #2d2640;

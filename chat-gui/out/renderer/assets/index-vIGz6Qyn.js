@@ -23747,8 +23747,8 @@ function Avatar({
     if (!animate || expression !== "neutral" && expression !== "idle") return;
     const interval = setInterval(() => {
       const rand = Math.random();
-      if (rand > 0.8) {
-        const exprs = ["happy", "thinking", "surprised", "neutral"];
+      if (rand > 0.7) {
+        const exprs = ["happy", "thinking", "surprised", "neutral", "excited", "sleepy", "curious"];
         const nextExpr = exprs[Math.floor(Math.random() * exprs.length)];
         setExpression(nextExpr);
         setTimeout(() => setExpression("neutral"), 2e3 + Math.random() * 2e3);
@@ -23781,6 +23781,76 @@ function Avatar({
         repeat: Infinity,
         ease: "linear"
       }
+    },
+    excited: {
+      y: [0, -8, 0],
+      rotate: [-3, 3, -3],
+      transition: {
+        duration: 0.5,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    happy: {
+      y: [0, -6, 0],
+      transition: {
+        duration: 1,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    sad: {
+      y: [0, 2, 0],
+      transition: {
+        duration: 5,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    angry: {
+      y: [0, 2, 0],
+      x: [-1, 1, -1],
+      transition: {
+        duration: 0.3,
+        repeat: Infinity,
+        ease: "linear"
+      }
+    },
+    sleepy: {
+      y: [0, -2, 0],
+      transition: {
+        duration: 6,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  };
+  const getFloatAnimation = () => {
+    if (!animate) return "initial";
+    switch (expression) {
+      case "speaking":
+        return "speaking";
+      case "excited":
+      case "veryHappy":
+        return "excited";
+      case "happy":
+        return "happy";
+      case "sad":
+      case "worried":
+        return "sad";
+      case "angry":
+        return "angry";
+      case "sleepy":
+        return "sleepy";
+      case "surprised":
+        return "excited";
+      case "shy":
+        return "happy";
+      case "thinking":
+      case "processing":
+        return "animate";
+      default:
+        return "animate";
     }
   };
   const glitchVariants = {
@@ -23808,15 +23878,124 @@ function Avatar({
         repeat: Infinity,
         ease: "easeInOut"
       }
+    },
+    excited: {
+      rotate: [-20, 20, -20],
+      transition: {
+        duration: 0.3,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    happy: {
+      rotate: [-10, 10, -10],
+      transition: {
+        duration: 1,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    angry: {
+      rotate: [0, -5, 0, 5, 0],
+      transition: {
+        duration: 0.2,
+        repeat: Infinity,
+        ease: "linear"
+      }
+    },
+    sad: {
+      rotate: [0, 5, 0],
+      transition: {
+        duration: 4,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    surprised: {
+      rotate: [-8, 8, -8],
+      scale: [1, 1.1, 1],
+      transition: {
+        duration: 0.5,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    shy: {
+      rotate: [0, -3, 0, 3, 0],
+      transition: {
+        duration: 3,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    worried: {
+      rotate: [0, 2, 0, -2, 0],
+      transition: {
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    },
+    veryHappy: {
+      rotate: [-15, 15, -15],
+      y: [0, -10, 0],
+      transition: {
+        duration: 0.4,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
     }
   };
   const effectiveExpression = externalExpression != null && externalExpression !== "" ? externalExpression : expression;
   const isThinking = effectiveExpression === "thinking" || effectiveExpression === "processing";
+  const getAntennaAnimation = () => {
+    if (!animate) return "initial";
+    switch (expression) {
+      case "listening":
+        return "listening";
+      case "excited":
+      case "veryHappy":
+        return "excited";
+      case "happy":
+        return "happy";
+      case "angry":
+        return "angry";
+      case "sad":
+      case "worried":
+        return "sad";
+      case "surprised":
+        return "surprised";
+      case "shy":
+        return "shy";
+      default:
+        return "animate";
+    }
+  };
   const getEyeScale = (side) => {
     if (blink) return { scaleY: 0.1 };
     switch (expression) {
       case "happy":
+      case "excited":
+      case "veryHappy":
         return { scaleY: 0.5, translateY: -5, borderRadius: "50%" };
+      case "angry":
+        return {
+          scaleY: 0.8,
+          rotate: side === "left" ? 15 : -15,
+          background: "#ff4444",
+          boxShadow: "0 0 8px #ff0000"
+        };
+      case "sad":
+      case "worried":
+        return { scaleY: 0.9, translateY: 2 };
+      case "surprised":
+        return { scaleX: 1.3, scaleY: 1.3 };
+      case "curious":
+        return { scaleX: 0.8, scaleY: 1.1 };
+      case "sleepy":
+        return { scaleY: 0.3, translateY: 3 };
+      case "shy":
+        return { scaleX: 0.9, scaleY: 0.9, translateY: 1 };
       case "listening":
         return {
           scale: [1, 1.1, 1],
@@ -23829,8 +24008,114 @@ function Avatar({
         };
       case "speaking":
         return { scaleY: [1, 0.8, 1] };
+      case "thinking":
+        return { scaleY: 0.7, background: "#ffaa00" };
       default:
         return { scaleY: 1 };
+    }
+  };
+  const getMouthStyle = () => {
+    switch (expression) {
+      case "happy":
+      case "excited":
+      case "veryHappy":
+        return {
+          height: 12,
+          width: 20,
+          borderRadius: "0 0 10px 10px",
+          background: "#00ffff",
+          opacity: 0.9
+        };
+      case "sad":
+      case "worried":
+        return {
+          height: 4,
+          width: 14,
+          borderRadius: "10px 10px 0 0",
+          border: "2px solid #00ffff",
+          background: "transparent",
+          opacity: 0.8
+        };
+      case "angry":
+        return {
+          height: 4,
+          width: 16,
+          borderRadius: "10px",
+          background: "#ff4444",
+          opacity: 0.9
+        };
+      case "surprised":
+        return {
+          height: 12,
+          width: 12,
+          borderRadius: "50%",
+          background: "#00ffff",
+          opacity: 0.9
+        };
+      case "sleepy":
+        return {
+          height: 3,
+          width: 10,
+          borderRadius: "5px",
+          background: "#00ffff",
+          opacity: 0.5
+        };
+      case "curious":
+        return {
+          height: 6,
+          width: 8,
+          borderRadius: "50%",
+          background: "#00ffff",
+          opacity: 0.8
+        };
+      case "shy":
+        return {
+          height: 6,
+          width: 10,
+          borderRadius: "0 0 8px 8px",
+          background: "#ff88aa",
+          opacity: 0.8
+        };
+      case "worried":
+        return {
+          height: 5,
+          width: 12,
+          borderRadius: "5px",
+          background: "#00ffff",
+          opacity: 0.6
+        };
+      case "veryHappy":
+        return {
+          height: 14,
+          width: 24,
+          borderRadius: "0 0 12px 12px",
+          background: "#00ffff",
+          opacity: 1
+        };
+      case "speaking":
+        return {
+          height: [4, 10, 4, 8, 2],
+          width: 14,
+          borderRadius: "0 0 8px 8px",
+          background: "#00ffff",
+          opacity: 0.9
+        };
+      case "thinking":
+      case "processing":
+        return {
+          height: 6,
+          width: 10,
+          borderRadius: "50%",
+          background: "#00ffff",
+          opacity: 0.8
+        };
+      default:
+        return {
+          height: 2,
+          width: 12,
+          background: "#00ffff",
+          opacity: 0.6
+        };
     }
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -23854,7 +24139,7 @@ function Avatar({
               position: "relative"
             },
             variants: floatVariants,
-            animate: animate ? expression === "speaking" ? "speaking" : expression === "thinking" || expression === "processing" ? "animate" : "animate" : "initial",
+            animate: getFloatAnimation(),
             children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs(
                 motion.div,
@@ -23869,7 +24154,7 @@ function Avatar({
                         className: "absolute left-1/2 top-0",
                         style: { x: "-50%", transformOrigin: "bottom center" },
                         variants: antennaVariants,
-                        animate: animate ? expression === "listening" ? "listening" : "animate" : "initial",
+                        animate: getAntennaAnimation(),
                         children: [
                           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-1 h-6 bg-[var(--ai-color)] mx-auto" }),
                           /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -23961,7 +24246,7 @@ function Avatar({
                               motion.div,
                               {
                                 className: "w-5 h-8 bg-[#00ffff] shadow-[0_0_10px_#00ffff] rounded-lg",
-                                animate: getEyeScale(),
+                                animate: getEyeScale("left"),
                                 transition: {
                                   type: "spring",
                                   stiffness: 300,
@@ -23974,7 +24259,7 @@ function Avatar({
                               motion.div,
                               {
                                 className: "w-5 h-8 bg-[#00ffff] shadow-[0_0_10px_#00ffff] rounded-lg",
-                                animate: getEyeScale(),
+                                animate: getEyeScale("right"),
                                 transition: {
                                   type: "spring",
                                   stiffness: 300,
@@ -23987,12 +24272,14 @@ function Avatar({
                           /* @__PURE__ */ jsxRuntimeExports.jsx(
                             motion.div,
                             {
-                              className: "absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-[#00ffff] opacity-80 rounded",
-                              animate: {
-                                height: expression === "speaking" ? [2, 6, 2, 4, 1] : expression === "happy" ? 4 : 2,
-                                width: expression === "happy" ? 24 : 12,
-                                opacity: expression === "neutral" ? 0 : 0.8
+                              className: "absolute left-1/2 transform -translate-x-1/2",
+                              style: {
+                                bottom: "12px",
+                                ...getMouthStyle()
                               },
+                              animate: expression === "speaking" ? {
+                                height: [4, 10, 4, 8, 2]
+                              } : {},
                               transition: expression === "speaking" ? {
                                 duration: 0.3,
                                 repeat: Infinity,
@@ -24499,10 +24786,112 @@ function Home() {
     voiceStatus,
     voskText,
     voiceStreamText,
-    isVoiceStreaming
+    isVoiceStreaming,
+    messages
   } = useWebSocket();
   const [showBubble, setShowBubble] = reactExports.useState(false);
+  const [customExpression, setCustomExpression] = reactExports.useState(null);
+  const [emotionHistory, setEmotionHistory] = reactExports.useState([]);
+  const [lastUserMessage, setLastUserMessage] = reactExports.useState("");
+  const [lastAIMessage, setLastAIMessage] = reactExports.useState("");
   const bubbleTimeoutRef = reactExports.useRef(null);
+  reactExports.useEffect(() => {
+    if (voiceStatus === "speaking" && isVoiceStreaming) {
+      const text2 = voiceStreamText.toLowerCase();
+      const hasExclamation = text2.includes("!");
+      const hasQuestion = text2.includes("?");
+      setLastAIMessage(text2);
+      const detectEmotion = (fullText) => {
+        const lowered = fullText.toLowerCase();
+        const greetings = ["hello", "hi", "hey", "good morning", "good evening", "good afternoon", "what's up", "howdy", "greetings", "good to see you", "nice to meet"];
+        const excitedWords = ["wow", "amazing", "incredible", "unbelievable", "omg", "oh my god", "no way", "can't wait", "super", "epic", "holy", "insane", "crazy"];
+        const happyWords = ["great", "awesome", "wonderful", "fantastic", "love", "thank", "thanks", "please", "happy", "nice", "good job", "well done", "congratulations", "yay", "cool", "brilliant", "perfect", "excellent", "good", "appreciate", "helpful"];
+        const angryWords = ["angry", "mad", "hate", "stupid", "idiot", "worst", "terrible", "horrible", "annoying", "frustrat", "annoyed", "furious", "irritat", "upset", "annoying", "upset", "unacceptable", "pathetic"];
+        const sadWords = ["sad", "sorry", "unfortunately", "miss", "lonely", "upset", "feeling bad", "depressed", "crying", "tears", "hurt", "broken", "heart", "unfortunately", "devastat"];
+        const surpriseWords = ["surprise", "shock", "unexpected", "wait what", "no way", "really", "unexpected", "wait a minute", "hold on"];
+        const fearWords = ["scared", "afraid", "worried", "nervous", "anxious", "fear", "panic", "terrify", "concern", "concerned", "danger"];
+        const cuteWords = ["cute", "adorable", "sweet", "precious", "baby", "kitten", "puppy", "fluffy", "萌", "kawaii", "precious"];
+        const complimentWords = ["beautiful", "pretty", "handsome", "gorgeous", "lovely", "charming", "wonderful", "stunning", " attractive"];
+        const commandWords = ["do this", "make it", "start", "stop", "turn on", "turn off", "run", "execute", "open", "close"];
+        const yesWords = ["yes", "yeah", "sure", "okay", "ok", "correct", "right", "definitely", "absolutely", "indeed", "do it", "trigger", "go ahead"];
+        const noWords = ["no", "nope", "not", "never", "nothing", "don't"];
+        const helpWords = ["help", "need", "can you", "please help", "could you", "would you", "assist", "support"];
+        if (helpWords.some((w) => lowered.includes(w))) {
+          return { emotion: "listening", score: 0.9 };
+        }
+        if (greetings.some((w) => lowered.includes(w))) {
+          return { emotion: "happy", score: 0.95 };
+        }
+        if (excitedWords.some((w) => lowered.includes(w)) && hasExclamation) {
+          return { emotion: "excited", score: 0.95 };
+        }
+        if (cuteWords.some((w) => lowered.includes(w))) {
+          return { emotion: "excited", score: 0.9 };
+        }
+        if (angryWords.some((w) => lowered.includes(w))) {
+          return { emotion: "angry", score: 0.9 };
+        }
+        if (sadWords.some((w) => lowered.includes(w))) {
+          return { emotion: "sad", score: 0.9 };
+        }
+        if (surpriseWords.some((w) => lowered.includes(w))) {
+          return { emotion: "surprised", score: 0.85 };
+        }
+        if (fearWords.some((w) => lowered.includes(w))) {
+          return { emotion: "worried", score: 0.85 };
+        }
+        if (complimentWords.some((w) => lowered.includes(w))) {
+          return { emotion: "shy", score: 0.85 };
+        }
+        if (commandWords.some((w) => lowered.includes(w))) {
+          return { emotion: "listening", score: 0.8 };
+        }
+        if (yesWords.some((w) => lowered === w || lowered.startsWith(w + " ") || lowered.endsWith(" " + w) || lowered.includes(" " + w + " "))) {
+          if (lastAIMessage.includes("alarm")) {
+            fetch("http://localhost:8000/security/manual_alarm", { method: "POST" }).catch(console.error);
+            return { emotion: "angry", score: 1 };
+          }
+          return { emotion: "happy", score: 0.75 };
+        }
+        if (noWords.some((w) => lowered === w || lowered.startsWith(w) || lowered.includes(" " + w + " "))) {
+          if (lastAIMessage.includes("alarm")) {
+            return { emotion: "sad", score: 0.6 };
+          }
+          return { emotion: "curious", score: 0.7 };
+        }
+        if (happyWords.some((w) => lowered.includes(w))) {
+          return { emotion: "happy", score: 0.7 };
+        }
+        if (hasQuestion) {
+          return { emotion: "curious", score: 0.8 };
+        }
+        if (hasExclamation) {
+          return { emotion: "excited", score: 0.65 };
+        }
+        return { emotion: null, score: 0 };
+      };
+      const combinedText = lastUserMessage + " " + text2;
+      const { emotion, score } = detectEmotion(combinedText);
+      if (emotion) {
+        setCustomExpression(emotion);
+        setEmotionHistory((prev) => [...prev.slice(-4), { emotion, score, timestamp: Date.now() }]);
+      }
+    } else if (voiceStatus === "listening") {
+      setCustomExpression("listening");
+    } else if (voiceStatus === "thinking") {
+      setCustomExpression("thinking");
+    } else {
+      setCustomExpression(null);
+    }
+  }, [voiceStatus, isVoiceStreaming, voiceStreamText, lastUserMessage, lastAIMessage]);
+  reactExports.useEffect(() => {
+    if (messages && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === "user" && lastMsg.text) {
+        setLastUserMessage(lastMsg.text);
+      }
+    }
+  }, [messages]);
   reactExports.useEffect(() => {
     const active = isVoiceStreaming || voiceStatus === "speaking";
     if (active) {
@@ -24540,9 +24929,6 @@ function Home() {
   const [newBill, setNewBill] = reactExports.useState({ name: "", amount: "", due_date: "", category: "Other" });
   const [newSavingsGoal, setNewSavingsGoal] = reactExports.useState({ name: "", target: "", icon: "💰" });
   const [activeTab, setActiveTab] = reactExports.useState("accounts");
-  const [showAddMoneyModal, setShowAddMoneyModal] = reactExports.useState(false);
-  const [quickAmount, setQuickAmount] = reactExports.useState("");
-  const [quickDesc, setQuickDesc] = reactExports.useState("");
   const fetchSecurityStatus = async () => {
     try {
       const resp = await fetch("http://localhost:8000/security/status");
@@ -24642,28 +25028,6 @@ function Home() {
   const handleBankingClick = () => {
     setShowBankingModal(true);
     fetchBankAccounts();
-  };
-  const handleQuickAddMoney = async () => {
-    if (!quickAmount || !quickDesc) return;
-    try {
-      await fetch("http://localhost:8000/banking/transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: parseFloat(quickAmount),
-          description: quickDesc,
-          type: "credit",
-          account: "My Checking",
-          category: "Income"
-        })
-      });
-      setQuickAmount("");
-      setQuickDesc("");
-      setShowAddMoneyModal(false);
-      fetchBankAccounts();
-    } catch (err) {
-      console.error("Failed to add money:", err);
-    }
   };
   const addOwing = async (e) => {
     e.preventDefault();
@@ -24935,7 +25299,7 @@ function Home() {
                     fontSize: "clamp(1.1rem, 4vw, 1.5rem)",
                     letterSpacing: "-.02em"
                   },
-                  children: "Add Money"
+                  children: "Viora AI"
                 }
               ),
               /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -24968,7 +25332,7 @@ function Home() {
                 {
                   variant: "xl",
                   animate: true,
-                  expression: voiceStatus,
+                  expression: customExpression || voiceStatus,
                   className: `cursor-pointer transition-all duration-300 ${isRecording ? "scale-110" : "hover:scale-105"}`
                 }
               ),
@@ -25104,15 +25468,6 @@ function Home() {
                   label: "FILES",
                   onClick: () => navigate("/files"),
                   color: "#8b5cf6"
-                }
-              ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                MenuButton,
-                {
-                  icon: Plus,
-                  label: "ADD MONEY",
-                  onClick: () => setShowAddMoneyModal(true),
-                  color: "#22c55e"
                 }
               ),
               /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -25580,6 +25935,56 @@ function Home() {
                   bankLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { textAlign: "center", padding: 40, color: "#94a3b8" }, children: "Loading..." }),
                   !bankLoading && bankAccounts && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { flex: 1, overflowY: "auto" }, children: [
                     activeTab === "accounts" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                      (() => {
+                        const totalAccounts = bankAccounts.accounts.reduce((sum, a) => sum + a.balance, 0);
+                        const totalOwedToMe = (bankAccounts.owed_to_me || []).reduce((s, o) => s + o.amount, 0);
+                        const totalOwing = (bankAccounts.owing || []).reduce((s, o) => s + o.amount, 0);
+                        const totalSavings = (bankAccounts.savings_goals || []).reduce((s, g) => s + g.current, 0);
+                        const grandTotal = totalAccounts + totalOwedToMe - totalOwing + totalSavings;
+                        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+                          background: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)",
+                          borderRadius: 20,
+                          padding: 20,
+                          marginBottom: 16,
+                          boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)"
+                        }, children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.85rem", color: "#ddd6fe", marginBottom: 4 }, children: "Grand Total" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "2.5rem", fontWeight: 700, color: "#fff" }, children: [
+                            "$",
+                            grandTotal.toFixed(2)
+                          ] }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.2)", gap: 8 }, children: [
+                            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.6rem", color: "#c4b5fd" }, children: "Accounts" }),
+                              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "0.8rem", fontWeight: 600, color: "#fff" }, children: [
+                                "$",
+                                totalAccounts.toFixed(2)
+                              ] })
+                            ] }),
+                            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.6rem", color: "#c4b5fd" }, children: "Owed to Me" }),
+                              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "0.8rem", fontWeight: 600, color: "#86efac" }, children: [
+                                "+$",
+                                totalOwedToMe.toFixed(2)
+                              ] })
+                            ] }),
+                            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.6rem", color: "#c4b5fd" }, children: "I Owe" }),
+                              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "0.8rem", fontWeight: 600, color: "#fca5a5" }, children: [
+                                "-$",
+                                totalOwing.toFixed(2)
+                              ] })
+                            ] }),
+                            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.6rem", color: "#c4b5fd" }, children: "Savings" }),
+                              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "0.8rem", fontWeight: 600, color: "#fcd34d" }, children: [
+                                "+$",
+                                totalSavings.toFixed(2)
+                              ] })
+                            ] })
+                          ] })
+                        ] });
+                      })(),
                       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
                         background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
                         borderRadius: 20,
@@ -25587,7 +25992,7 @@ function Home() {
                         marginBottom: 16,
                         boxShadow: "0 8px 24px rgba(37, 99, 235, 0.4)"
                       }, children: [
-                        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.85rem", color: "#bfdbfe", marginBottom: 8 }, children: "Total Balance" }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.85rem", color: "#bfdbfe", marginBottom: 8 }, children: "Bank Balance" }),
                         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "2rem", fontWeight: 700, color: "#fff" }, children: [
                           "$",
                           bankAccounts.accounts.reduce((sum, a) => sum + a.balance, 0).toFixed(2)
@@ -25847,122 +26252,6 @@ function Home() {
                       ] })
                     ] })
                   ] })
-                ]
-              }
-            )
-          }
-        ) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(AnimatePresence, { children: showAddMoneyModal && /* @__PURE__ */ jsxRuntimeExports.jsx(
-          motion.div,
-          {
-            initial: { opacity: 0 },
-            animate: { opacity: 1 },
-            exit: { opacity: 0 },
-            style: {
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 100,
-              padding: 20
-            },
-            onClick: () => setShowAddMoneyModal(false),
-            children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              motion.div,
-              {
-                initial: { scale: 0.9, y: 20 },
-                animate: { scale: 1, y: 0 },
-                exit: { scale: 0.9, y: 20 },
-                style: {
-                  background: "linear-gradient(180deg, #166534 0%, #14532d 100%)",
-                  borderRadius: 24,
-                  padding: 24,
-                  maxWidth: 360,
-                  width: "100%",
-                  border: "1.5px solid #22c55e",
-                  boxShadow: "0 20px 60px rgba(0,0,0,0.5)"
-                },
-                onClick: (e) => e.stopPropagation(),
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }, children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 24, color: "#22c55e" }),
-                      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { style: { fontSize: "1.25rem", fontWeight: 700, color: "#fff" }, children: "Add Money" })
-                    ] }),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx(
-                      "button",
-                      {
-                        onClick: () => setShowAddMoneyModal(false),
-                        style: { background: "none", border: "none", cursor: "pointer", color: "#86efac", fontSize: "1.5rem" },
-                        children: "×"
-                      }
-                    )
-                  ] }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "input",
-                    {
-                      type: "number",
-                      step: "0.01",
-                      value: quickAmount,
-                      onChange: (e) => setQuickAmount(e.target.value),
-                      placeholder: "Amount",
-                      autoFocus: true,
-                      style: {
-                        width: "100%",
-                        padding: "16px 20px",
-                        borderRadius: 14,
-                        border: "2px solid #22c55e",
-                        background: "rgba(255,255,255,0.1)",
-                        color: "#fff",
-                        fontSize: "1.5rem",
-                        fontWeight: 700,
-                        outline: "none",
-                        marginBottom: 16,
-                        textAlign: "center"
-                      }
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "input",
-                    {
-                      type: "text",
-                      value: quickDesc,
-                      onChange: (e) => setQuickDesc(e.target.value),
-                      placeholder: "Description (e.g. Paycheck, Gift)",
-                      style: {
-                        width: "100%",
-                        padding: "14px 16px",
-                        borderRadius: 14,
-                        border: "1px solid #4ade80",
-                        background: "rgba(255,255,255,0.1)",
-                        color: "#fff",
-                        fontSize: "1rem",
-                        outline: "none",
-                        marginBottom: 20
-                      }
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "button",
-                    {
-                      onClick: handleQuickAddMoney,
-                      style: {
-                        width: "100%",
-                        padding: 16,
-                        borderRadius: 14,
-                        border: "none",
-                        background: "#22c55e",
-                        color: "#fff",
-                        fontSize: "1.1rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        boxShadow: "0 4px 12px rgba(34, 197, 94, 0.4)"
-                      },
-                      children: "Add to Account"
-                    }
-                  )
                 ]
               }
             )
@@ -39534,6 +39823,9 @@ function CameraView() {
   const [detectionActive, setDetectionActive] = reactExports.useState(false);
   const [detectionError, setDetectionError] = reactExports.useState(null);
   const [flash, setFlash] = reactExports.useState(false);
+  const [cameras, setCameras] = reactExports.useState([]);
+  const [selectedCamera, setSelectedCamera] = reactExports.useState(null);
+  const [showCameraSelector, setShowCameraSelector] = reactExports.useState(false);
   const wsRef = reactExports.useRef(null);
   const videoContainerRef = reactExports.useRef(null);
   const [containerSize, setContainerSize] = reactExports.useState({ width: 1, height: 1 });
@@ -39544,6 +39836,8 @@ function CameraView() {
   const detectionStartUrl = `${API_BASE_URL}/camera/detection/start`;
   const detectionStopUrl = `${API_BASE_URL}/camera/detection/stop`;
   const captureUrl = `${API_BASE_URL}/camera/capture`;
+  const listCamerasUrl = `${API_BASE_URL}/camera/list`;
+  const selectCameraUrl = `${API_BASE_URL}/camera/select`;
   reactExports.useEffect(() => {
     let isMounted = true;
     const sessionId = Math.random().toString(36).substring(7);
@@ -39644,6 +39938,32 @@ function CameraView() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const refreshCameras = async () => {
+    try {
+      const res = await fetch(listCamerasUrl);
+      const data = await res.json();
+      setCameras(data.cameras || []);
+      if (data.cameras && data.cameras.length > 0 && !selectedCamera) {
+        setSelectedCamera(data.cameras[0].index);
+      }
+    } catch (e) {
+      console.error("Failed to list cameras:", e);
+    }
+  };
+  const selectCamera = async (index2) => {
+    try {
+      await fetch(selectCameraUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index: index2 })
+      });
+      setSelectedCamera(index2);
+      setShowCameraSelector(false);
+      window.location.reload();
+    } catch (e) {
+      console.error("Failed to select camera:", e);
+    }
+  };
   const toggleDetection = async () => {
     setDetectionError(null);
     if (detectionActive) {
@@ -39788,7 +40108,19 @@ function CameraView() {
               children: /* @__PURE__ */ jsxRuntimeExports.jsx(ArrowLeft, { size: 24 })
             }
           ),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-end pointer-events-auto", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-end pointer-events-auto gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => {
+                  refreshCameras();
+                  setShowCameraSelector(true);
+                },
+                className: "pointer-events-auto p-2 rounded-xl flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all",
+                title: "Select Camera",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx(Camera, { size: 20 })
+              }
+            ),
             status === "connecting" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 px-4 py-2 bg-black/60 backdrop-blur border border-white/20 rounded-full text-xs text-white font-['Plus_Jakarta_Sans'] animate-pulse", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 14, className: "animate-spin" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Connecting" })
@@ -39861,7 +40193,54 @@ function CameraView() {
               ]
             }
           )
-        ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(AnimatePresence, { children: showCameraSelector && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          motion.div,
+          {
+            initial: { opacity: 0 },
+            animate: { opacity: 1 },
+            exit: { opacity: 0 },
+            className: "fixed inset-0 z-[100] flex items-center justify-center bg-black/70",
+            onClick: () => setShowCameraSelector(false),
+            children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              motion.div,
+              {
+                initial: { scale: 0.9 },
+                animate: { scale: 1 },
+                exit: { scale: 0.9 },
+                className: "bg-gray-900 border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4",
+                onClick: (e) => e.stopPropagation(),
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-white font-semibold mb-4", children: "Select Camera" }),
+                  cameras.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-gray-400 text-sm", children: "No cameras found. Check USB connection." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: cameras.map((cam) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "button",
+                    {
+                      onClick: () => selectCamera(cam.index),
+                      className: `w-full p-3 rounded-xl text-left transition-all ${selectedCamera === cam.index ? "bg-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}`,
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-medium", children: cam.name }),
+                        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs opacity-70", children: [
+                          cam.width,
+                          "x",
+                          cam.height
+                        ] })
+                      ]
+                    },
+                    cam.index
+                  )) }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => setShowCameraSelector(false),
+                      className: "w-full mt-4 p-3 rounded-xl bg-gray-800 text-gray-300 hover:bg-gray-700",
+                      children: "Cancel"
+                    }
+                  )
+                ]
+              }
+            )
+          }
+        ) })
       ]
     }
   );

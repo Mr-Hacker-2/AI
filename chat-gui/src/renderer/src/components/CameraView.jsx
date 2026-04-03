@@ -18,6 +18,9 @@ export default function CameraView() {
     const [detectionActive, setDetectionActive] = useState(false);
     const [detectionError, setDetectionError] = useState(null);
     const [flash, setFlash] = useState(false);
+    const [cameras, setCameras] = useState([]);
+    const [selectedCamera, setSelectedCamera] = useState(null);
+    const [showCameraSelector, setShowCameraSelector] = useState(false);
     const wsRef = useRef(null);
     const videoContainerRef = useRef(null);
     const [containerSize, setContainerSize] = useState({ width: 1, height: 1 });
@@ -29,6 +32,8 @@ export default function CameraView() {
     const detectionStartUrl = `${API_BASE_URL}/camera/detection/start`;
     const detectionStopUrl = `${API_BASE_URL}/camera/detection/stop`;
     const captureUrl = `${API_BASE_URL}/camera/capture`;
+    const listCamerasUrl = `${API_BASE_URL}/camera/list`;
+    const selectCameraUrl = `${API_BASE_URL}/camera/select`;
 
     useEffect(() => {
         let isMounted = true;
@@ -141,6 +146,34 @@ export default function CameraView() {
         ro.observe(el);
         return () => ro.disconnect();
     }, []);
+
+    const refreshCameras = async () => {
+        try {
+            const res = await fetch(listCamerasUrl);
+            const data = await res.json();
+            setCameras(data.cameras || []);
+            if (data.cameras && data.cameras.length > 0 && !selectedCamera) {
+                setSelectedCamera(data.cameras[0].index);
+            }
+        } catch (e) {
+            console.error('Failed to list cameras:', e);
+        }
+    };
+
+    const selectCamera = async (index) => {
+        try {
+            await fetch(selectCameraUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index })
+            });
+            setSelectedCamera(index);
+            setShowCameraSelector(false);
+            window.location.reload();
+        } catch (e) {
+            console.error('Failed to select camera:', e);
+        }
+    };
 
     const toggleDetection = async () => {
         setDetectionError(null);
@@ -289,7 +322,14 @@ export default function CameraView() {
                     <ArrowLeft size={24} />
                 </button>
 
-                <div className="flex flex-col items-end pointer-events-auto">
+                <div className="flex flex-col items-end pointer-events-auto gap-2">
+                    <button
+                        onClick={() => { refreshCameras(); setShowCameraSelector(true); }}
+                        className="pointer-events-auto p-2 rounded-xl flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all"
+                        title="Select Camera"
+                    >
+                        <Camera size={20} />
+                    </button>
                     {status === 'connecting' && (
                         <div className="flex items-center gap-2 px-4 py-2 bg-black/60 backdrop-blur border border-white/20 rounded-full text-xs text-white font-['Plus_Jakarta_Sans'] animate-pulse">
                             <RefreshCw size={14} className="animate-spin" />
@@ -376,6 +416,54 @@ export default function CameraView() {
                     {detectionError && <span className="text-[8px] text-red-400 max-w-[80px] truncate">{detectionError}</span>}
                 </button>
             </div>
+
+            <AnimatePresence>
+                {showCameraSelector && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70"
+                        onClick={() => setShowCameraSelector(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0.9 }}
+                            className="bg-gray-900 border border-white/20 rounded-2xl p-6 max-w-sm w-full mx-4"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <h3 className="text-white font-semibold mb-4">Select Camera</h3>
+                            {cameras.length === 0 ? (
+                                <p className="text-gray-400 text-sm">No cameras found. Check USB connection.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {cameras.map(cam => (
+                                        <button
+                                            key={cam.index}
+                                            onClick={() => selectCamera(cam.index)}
+                                            className={`w-full p-3 rounded-xl text-left transition-all ${
+                                                selectedCamera === cam.index
+                                                    ? 'bg-purple-600 text-white'
+                                                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                            }`}
+                                        >
+                                            <div className="font-medium">{cam.name}</div>
+                                            <div className="text-xs opacity-70">{cam.width}x{cam.height}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <button
+                                onClick={() => setShowCameraSelector(false)}
+                                className="w-full mt-4 p-3 rounded-xl bg-gray-800 text-gray-300 hover:bg-gray-700"
+                            >
+                                Cancel
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }

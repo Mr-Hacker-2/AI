@@ -26,6 +26,29 @@ STREAM_WIDTH = 640
 STREAM_HEIGHT = 384
 STREAM_FPS = 30
 DETECTION_FRAME_INTERVAL = 3
+PERSON_DETECTED_COOLDOWN = 30  # seconds between person detection alerts
+
+# --- Person Detection Alert Callback ---
+_person_detection_callback = None
+_last_person_alert_time = 0
+
+def set_person_detection_callback(callback):
+    """Set a callback to be called when a person is detected."""
+    global _person_detection_callback
+    _person_detection_callback = callback
+
+def trigger_person_alert():
+    """Trigger person detection alert with cooldown."""
+    global _last_person_alert_time
+    import time
+    current_time = time.time()
+    if current_time - _last_person_alert_time > PERSON_DETECTED_COOLDOWN:
+        _last_person_alert_time = current_time
+        if _person_detection_callback:
+            try:
+                _person_detection_callback()
+            except Exception as e:
+                logger.error(f"Person alert callback error: {e}")
 
 # --- Camera Process Logic ---
 CAMERA_RESTART_DELAY = 2.0   # seconds to wait before reinit after timeout
@@ -298,13 +321,21 @@ def _run_detection_worker():
         scores = det_dict["detection_scores"]
         h, w = frame.shape[0], frame.shape[1]
         payload = []
+        person_detected = False
         for i in range(len(boxes)):
             xmin, ymin, xmax, ymax = boxes[i]
+            label = labels[classes[i]] if classes[i] < len(labels) else str(classes[i])
+            if label.lower() in ['person', 'human']:
+                person_detected = True
             payload.append({
                 "bbox": [xmin / w, ymin / h, xmax / w, ymax / h],
-                "label": labels[classes[i]] if classes[i] < len(labels) else str(classes[i]),
+                "label": label,
                 "confidence": float(scores[i]),
             })
+        
+        if person_detected:
+            trigger_person_alert()
+        
         with _latest_detections_lock:
             _latest_detections[:] = payload
         if _detection_loop:
@@ -396,6 +427,23 @@ async def list_cameras():
         except Exception:
             pass
     return {"cameras": available}
+
+@router.post("/camera/select")
+async def select_camera(request: dict):
+    """Select which camera to use by index."""
+    global camera_process
+    index = int(request.get("index", 0))
+    os.environ["CAMERA_INDEX"] = str(index)
+    logger.info(f"Camera index set to {index}")
+    
+    if camera_process and camera_process.is_alive():
+        stop_event.set()
+        camera_process.join(timeout=3)
+        if camera_process.is_alive():
+            camera_process.terminate()
+        camera_process = None
+    
+    return {"status": "success", "index": index}
 
 @router.get("/system/stats")
 async def get_stats():

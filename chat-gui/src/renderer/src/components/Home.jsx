@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Settings, Camera, Image as GalleryIcon, Code, Map, Bot, Cloud, MapPin, Search, Gamepad2, Shield, Siren, Lock, Unlock, Terminal, Folder, CreditCard, Plus } from 'lucide-react';
+import { MessageCircle, Settings, Camera, Image as GalleryIcon, Code, Map, Bot, Cloud, MapPin, Search, Gamepad2, Shield, Siren, Lock, Unlock, Terminal, Folder, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Avatar from './Avatar';
 import { useWebSocket } from '../contexts/WebSocketContext.jsx';
@@ -51,11 +51,133 @@ export default function Home() {
     voiceStatus,
     voskText,
     voiceStreamText,
-    isVoiceStreaming
+    isVoiceStreaming,
+    messages
   } = useWebSocket();
 
   const [showBubble, setShowBubble] = useState(false);
+  const [customExpression, setCustomExpression] = useState(null);
+  const [emotionHistory, setEmotionHistory] = useState([]);
+  const [lastUserMessage, setLastUserMessage] = useState('');
+  const [lastAIMessage, setLastAIMessage] = useState('');
   const bubbleTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (voiceStatus === 'speaking' && isVoiceStreaming) {
+      const text = voiceStreamText.toLowerCase();
+      const hasExclamation = text.includes('!');
+      const hasQuestion = text.includes('?');
+      
+      setLastAIMessage(text);
+      
+      const detectEmotion = (fullText) => {
+        const lowered = fullText.toLowerCase();
+        
+        const greetings = ['hello', 'hi', 'hey', 'good morning', 'good evening', 'good afternoon', "what's up", 'howdy', 'greetings', 'good to see you', 'nice to meet'];
+        const excitedWords = ['wow', 'amazing', 'incredible', 'unbelievable', 'omg', 'oh my god', 'no way', "can't wait", 'super', 'epic', 'holy', 'insane', 'crazy'];
+        const happyWords = ['great', 'awesome', 'wonderful', 'fantastic', 'love', 'thank', 'thanks', 'please', 'happy', 'nice', 'good job', 'well done', 'congratulations', 'yay', 'cool', 'brilliant', 'perfect', 'excellent', 'good', 'appreciate', 'helpful'];
+        const angryWords = ['angry', 'mad', 'hate', 'stupid', 'idiot', 'worst', 'terrible', 'horrible', 'annoying', 'frustrat', 'annoyed', 'furious', 'irritat', 'upset', 'annoying', 'upset', 'unacceptable', 'pathetic'];
+        const sadWords = ['sad', 'sorry', 'unfortunately', 'miss', 'lonely', 'upset', 'feeling bad', 'depressed', 'crying', 'tears', 'hurt', 'broken', 'heart', 'unfortunately', 'devastat'];
+        const surpriseWords = ['surprise', 'shock', 'unexpected', 'wait what', 'no way', 'really', 'unexpected', 'wait a minute', 'hold on'];
+        const fearWords = ['scared', 'afraid', 'worried', 'nervous', 'anxious', 'fear', 'panic', 'terrify', 'concern', 'concerned', 'danger'];
+        const cuteWords = ['cute', 'adorable', 'sweet', 'precious', 'baby', 'kitten', 'puppy', 'fluffy', '萌', 'kawaii', 'precious'];
+        const complimentWords = ['beautiful', 'pretty', 'handsome', 'gorgeous', 'lovely', 'charming', 'wonderful', 'stunning', ' attractive'];
+        const commandWords = ['do this', 'make it', 'start', 'stop', 'turn on', 'turn off', 'run', 'execute', 'open', 'close'];
+        const yesWords = ['yes', 'yeah', 'sure', 'okay', 'ok', 'correct', 'right', 'definitely', 'absolutely', 'indeed', 'do it', 'trigger', 'go ahead'];
+        const noWords = ['no', 'nope', 'not', 'never', 'nothing', 'don\'t'];
+        const helpWords = ['help', 'need', 'can you', 'please help', 'could you', 'would you', 'assist', 'support'];
+        
+        if (helpWords.some(w => lowered.includes(w))) {
+          return { emotion: 'listening', score: 0.9 };
+        }
+        if (greetings.some(w => lowered.includes(w))) {
+          return { emotion: 'happy', score: 0.95 };
+        }
+        if (excitedWords.some(w => lowered.includes(w)) && hasExclamation) {
+          return { emotion: 'excited', score: 0.95 };
+        }
+        if (cuteWords.some(w => lowered.includes(w))) {
+          return { emotion: 'excited', score: 0.9 };
+        }
+        if (angryWords.some(w => lowered.includes(w))) {
+          return { emotion: 'angry', score: 0.9 };
+        }
+        if (sadWords.some(w => lowered.includes(w))) {
+          return { emotion: 'sad', score: 0.9 };
+        }
+        if (surpriseWords.some(w => lowered.includes(w))) {
+          return { emotion: 'surprised', score: 0.85 };
+        }
+        if (fearWords.some(w => lowered.includes(w))) {
+          return { emotion: 'worried', score: 0.85 };
+        }
+        if (complimentWords.some(w => lowered.includes(w))) {
+          return { emotion: 'shy', score: 0.85 };
+        }
+        if (commandWords.some(w => lowered.includes(w))) {
+          return { emotion: 'listening', score: 0.8 };
+        }
+        if (yesWords.some(w => lowered === w || lowered.startsWith(w + ' ') || lowered.endsWith(' ' + w) || lowered.includes(' ' + w + ' '))) {
+          if (lastAIMessage.includes('alarm')) {
+            fetch('http://localhost:8000/security/manual_alarm', { method: 'POST' }).catch(console.error);
+            return { emotion: 'angry', score: 1.0 };
+          }
+          return { emotion: 'happy', score: 0.75 };
+        }
+        if (noWords.some(w => lowered === w || lowered.startsWith(w) || lowered.includes(' ' + w + ' '))) {
+          if (lastAIMessage.includes('alarm')) {
+            return { emotion: 'sad', score: 0.6 };
+          }
+          return { emotion: 'curious', score: 0.7 };
+        }
+        if (happyWords.some(w => lowered.includes(w))) {
+          return { emotion: 'happy', score: 0.7 };
+        }
+        if (hasQuestion) {
+          return { emotion: 'curious', score: 0.8 };
+        }
+        if (hasExclamation) {
+          return { emotion: 'excited', score: 0.65 };
+        }
+        return { emotion: null, score: 0 };
+      };
+      
+      const combinedText = lastUserMessage + ' ' + text;
+      const { emotion, score } = detectEmotion(combinedText);
+      
+      if (emotion) {
+        setCustomExpression(emotion);
+        setEmotionHistory(prev => [...prev.slice(-4), { emotion, score, timestamp: Date.now() }]);
+      }
+    } else if (voiceStatus === 'listening') {
+      setCustomExpression('listening');
+    } else if (voiceStatus === 'thinking') {
+      setCustomExpression('thinking');
+    } else {
+      setCustomExpression(null);
+    }
+  }, [voiceStatus, isVoiceStreaming, voiceStreamText, lastUserMessage, lastAIMessage]);
+
+  useEffect(() => {
+    if (messages && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === 'user' && lastMsg.text) {
+        setLastUserMessage(lastMsg.text);
+      }
+    }
+  }, [messages]);
+
+  const getRobotMood = () => {
+    if (emotionHistory.length < 2) return 'neutral';
+    const recent = emotionHistory.slice(-3);
+    const avgScore = recent.reduce((sum, e) => sum + e.score, 0) / recent.length;
+    const emotions = recent.map(e => e.emotion);
+    if (emotions.includes('excited') && avgScore > 0.7) return 'veryHappy';
+    if (emotions.includes('happy') && avgScore > 0.6) return 'happy';
+    if (emotions.includes('angry')) return 'annoyed';
+    if (emotions.includes('sad')) return 'concerned';
+    return 'neutral';
+  };
 
   useEffect(() => {
     const active = isVoiceStreaming || voiceStatus === 'speaking';
@@ -103,9 +225,6 @@ export default function Home() {
   const [newBill, setNewBill] = useState({ name: '', amount: '', due_date: '', category: 'Other' });
   const [newSavingsGoal, setNewSavingsGoal] = useState({ name: '', target: '', icon: '💰' });
   const [activeTab, setActiveTab] = useState('accounts');
-  const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
-  const [quickAmount, setQuickAmount] = useState('');
-  const [quickDesc, setQuickDesc] = useState('');
 
   const fetchSecurityStatus = async () => {
     try {
@@ -213,29 +332,6 @@ export default function Home() {
   const handleBankingClick = () => {
     setShowBankingModal(true);
     fetchBankAccounts();
-  };
-
-  const handleQuickAddMoney = async () => {
-    if (!quickAmount || !quickDesc) return;
-    try {
-      await fetch('http://localhost:8000/banking/transaction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: parseFloat(quickAmount),
-          description: quickDesc,
-          type: 'credit',
-          account: 'My Checking',
-          category: 'Income'
-        })
-      });
-      setQuickAmount('');
-      setQuickDesc('');
-      setShowAddMoneyModal(false);
-      fetchBankAccounts();
-    } catch (err) {
-      console.error('Failed to add money:', err);
-    }
   };
 
   const addOwing = async (e) => {
@@ -518,18 +614,18 @@ export default function Home() {
       <div
         className="flex flex-col items-center gap-2 mb-6 z-10"
         style={{ animation: 'fadeUp .4s ease both' }}
-      >
-        <h1
-          style={{
-            fontFamily: 'var(--font-head)',
-            fontWeight: 800,
-            color: AI_COLOR,
-            fontSize: 'clamp(1.1rem, 4vw, 1.5rem)',
-            letterSpacing: '-.02em',
-          }}
         >
-          Add Money
-        </h1>
+          <h1
+            style={{
+              fontFamily: 'var(--font-head)',
+              fontWeight: 800,
+              color: AI_COLOR,
+              fontSize: 'clamp(1.1rem, 4vw, 1.5rem)',
+              letterSpacing: '-.02em',
+            }}
+          >
+            Viora AI
+          </h1>
         <span
           style={{
             fontSize: 'clamp(.6rem, 1.8vw, .7rem)',
@@ -554,7 +650,7 @@ export default function Home() {
         <Avatar
           variant="xl"
           animate={true}
-          expression={voiceStatus}
+          expression={customExpression || voiceStatus}
           className={`cursor-pointer transition-all duration-300 ${isRecording ? 'scale-110' : 'hover:scale-105'}`}
         />
 
@@ -667,12 +763,6 @@ export default function Home() {
           label="FILES"
           onClick={() => navigate('/files')}
           color="#8b5cf6"
-        />
-        <MenuButton
-          icon={Plus}
-          label="ADD MONEY"
-          onClick={() => setShowAddMoneyModal(true)}
-          color="#22c55e"
         />
         <MenuButton
           icon={CreditCard}
@@ -1159,6 +1249,33 @@ export default function Home() {
                   {/* ACCOUNTS TAB */}
                   {activeTab === 'accounts' && (
                     <>
+                      {(() => {
+                        const totalAccounts = bankAccounts.accounts.reduce((sum, a) => sum + a.balance, 0);
+                        const totalOwedToMe = (bankAccounts.owed_to_me || []).reduce((s, o) => s + o.amount, 0);
+                        const totalOwing = (bankAccounts.owing || []).reduce((s, o) => s + o.amount, 0);
+                        const totalSavings = (bankAccounts.savings_goals || []).reduce((s, g) => s + g.current, 0);
+                        const grandTotal = totalAccounts + totalOwedToMe - totalOwing + totalSavings;
+                        return (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)',
+                            borderRadius: 20,
+                            padding: 20,
+                            marginBottom: 16,
+                            boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)',
+                          }}>
+                            <div style={{ fontSize: '0.85rem', color: '#ddd6fe', marginBottom: 4 }}>Grand Total</div>
+                            <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#fff' }}>
+                              ${grandTotal.toFixed(2)}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.2)', gap: 8 }}>
+                              <div><div style={{ fontSize: '0.6rem', color: '#c4b5fd' }}>Accounts</div><div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fff' }}>${totalAccounts.toFixed(2)}</div></div>
+                              <div><div style={{ fontSize: '0.6rem', color: '#c4b5fd' }}>Owed to Me</div><div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#86efac' }}>+${totalOwedToMe.toFixed(2)}</div></div>
+                              <div><div style={{ fontSize: '0.6rem', color: '#c4b5fd' }}>I Owe</div><div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fca5a5' }}>-${totalOwing.toFixed(2)}</div></div>
+                              <div><div style={{ fontSize: '0.6rem', color: '#c4b5fd' }}>Savings</div><div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fcd34d' }}>+${totalSavings.toFixed(2)}</div></div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <div style={{
                         background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                         borderRadius: 20,
@@ -1166,7 +1283,7 @@ export default function Home() {
                         marginBottom: 16,
                         boxShadow: '0 8px 24px rgba(37, 99, 235, 0.4)',
                       }}>
-                        <div style={{ fontSize: '0.85rem', color: '#bfdbfe', marginBottom: 8 }}>Total Balance</div>
+                        <div style={{ fontSize: '0.85rem', color: '#bfdbfe', marginBottom: 8 }}>Bank Balance</div>
                         <div style={{ fontSize: '2rem', fontWeight: 700, color: '#fff' }}>
                           ${(bankAccounts.accounts.reduce((sum, a) => sum + a.balance, 0)).toFixed(2)}
                         </div>
@@ -1328,115 +1445,6 @@ export default function Home() {
                   )}
                 </div>
               )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Add Money Modal */}
-      <AnimatePresence>
-        {showAddMoneyModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-              padding: 20,
-            }}
-            onClick={() => setShowAddMoneyModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              style={{
-                background: 'linear-gradient(180deg, #166534 0%, #14532d 100%)',
-                borderRadius: 24,
-                padding: 24,
-                maxWidth: 360,
-                width: '100%',
-                border: '1.5px solid #22c55e',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Plus size={24} color="#22c55e" />
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff' }}>Add Money</h2>
-                </div>
-                <button
-                  onClick={() => setShowAddMoneyModal(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#86efac', fontSize: '1.5rem' }}
-                >
-                  ×
-                </button>
-              </div>
-
-              <input
-                type="number"
-                step="0.01"
-                value={quickAmount}
-                onChange={(e) => setQuickAmount(e.target.value)}
-                placeholder="Amount"
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '16px 20px',
-                  borderRadius: 14,
-                  border: '2px solid #22c55e',
-                  background: 'rgba(255,255,255,0.1)',
-                  color: '#fff',
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  outline: 'none',
-                  marginBottom: 16,
-                  textAlign: 'center',
-                }}
-              />
-
-              <input
-                type="text"
-                value={quickDesc}
-                onChange={(e) => setQuickDesc(e.target.value)}
-                placeholder="Description (e.g. Paycheck, Gift)"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  borderRadius: 14,
-                  border: '1px solid #4ade80',
-                  background: 'rgba(255,255,255,0.1)',
-                  color: '#fff',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  marginBottom: 20,
-                }}
-              />
-
-              <button
-                onClick={handleQuickAddMoney}
-                style={{
-                  width: '100%',
-                  padding: 16,
-                  borderRadius: 14,
-                  border: 'none',
-                  background: '#22c55e',
-                  color: '#fff',
-                  fontSize: '1.1rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.4)',
-                }}
-              >
-                Add to Account
-              </button>
             </motion.div>
           </motion.div>
         )}

@@ -225,6 +225,35 @@ async def add_to_savings_goal(goal_id: int, request: dict):
             goal["current"] = min(goal["current"] + amount, goal["target"])
             break
     
+    checking_acc = next((a for a in data["accounts"] if "Checking" in a["name"]), None)
+    savings_acc = next((a for a in data["accounts"] if "Savings" in a["name"]), None)
+    
+    if checking_acc and savings_acc and checking_acc["balance"] >= amount:
+        checking_acc["balance"] -= amount
+        savings_acc["balance"] += amount
+        
+        transaction = {
+            "id": len(data["transactions"]) + 1,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "description": f"Transfer to Savings",
+            "amount": -amount,
+            "type": "debit",
+            "account": checking_acc["name"],
+            "category": "Transfer"
+        }
+        data["transactions"].insert(0, transaction)
+        
+        transaction2 = {
+            "id": len(data["transactions"]) + 2,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "description": f"Transfer from Checking",
+            "amount": amount,
+            "type": "credit",
+            "account": savings_acc["name"],
+            "category": "Transfer"
+        }
+        data["transactions"].insert(0, transaction2)
+    
     save_data(data)
     return {"status": "success", "data": data}
 

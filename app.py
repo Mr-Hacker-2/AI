@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from config import PORT, CAPTURES_DIR, setup_logging
-from camera_stream import router as camera_router
+from camera_stream import router as camera_router, set_person_detection_callback, trigger_person_alert
 from chat_ai import router as chat_router, ai as ai_state
 from weather import router as weather_router
 from maps import router as maps_router
@@ -75,6 +75,12 @@ async def security_stop_alarm():
 @app.on_event("startup")
 async def startup_event():
     logger.info("Unified Backend starting up...")
+    
+    # Register person detection callback
+    from unified_security import trigger_voice_alert
+    set_person_detection_callback(trigger_voice_alert)
+    logger.info("Person detection callback registered")
+    
     if not os.environ.get("SKIP_MODEL_LOAD"):
         ai_state.load_model()
         # Dev AI model loads on first request (lazy)

@@ -101,12 +101,15 @@
     --color-indigo-400: oklch(67.3% .182 276.935);
     --color-purple-300: oklch(82.7% .119 306.383);
     --color-purple-400: oklch(71.4% .203 305.504);
+    --color-purple-600: oklch(55.8% .288 302.321);
     --color-pink-400: oklch(71.8% .202 349.761);
     --color-slate-700: oklch(37.2% .044 257.287);
+    --color-gray-300: oklch(87.2% .01 258.338);
     --color-gray-400: oklch(70.7% .022 261.325);
     --color-gray-500: oklch(55.1% .027 264.364);
     --color-gray-700: oklch(37.3% .034 259.733);
     --color-gray-800: oklch(27.8% .033 256.848);
+    --color-gray-900: oklch(21% .034 264.665);
     --color-gray-950: oklch(13% .028 261.692);
     --color-black: #000;
     --color-white: #fff;
@@ -691,10 +694,6 @@
     bottom: 25%;
   }
 
-  .bottom-3 {
-    bottom: calc(var(--spacing) * 3);
-  }
-
   .bottom-4 {
     bottom: calc(var(--spacing) * 4);
   }
@@ -773,6 +772,10 @@
 
   .z-\[9999\] {
     z-index: 9999;
+  }
+
+  .mx-4 {
+    margin-inline: calc(var(--spacing) * 4);
   }
 
   .mx-auto {
@@ -1767,6 +1770,16 @@
     }
   }
 
+  .bg-black\/70 {
+    background-color: #000000b3;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-black\/70 {
+      background-color: color-mix(in oklab, var(--color-black) 70%, transparent);
+    }
+  }
+
   .bg-black\/80 {
     background-color: #000c;
   }
@@ -1827,6 +1840,10 @@
     background-color: var(--color-gray-800);
   }
 
+  .bg-gray-900 {
+    background-color: var(--color-gray-900);
+  }
+
   .bg-gray-950 {
     background-color: var(--color-gray-950);
   }
@@ -1871,6 +1888,10 @@
 
   .bg-purple-400 {
     background-color: var(--color-purple-400);
+  }
+
+  .bg-purple-600 {
+    background-color: var(--color-purple-600);
   }
 
   .bg-red-500 {
@@ -2366,6 +2387,10 @@
 
   .text-cyan-400 {
     color: var(--color-cyan-400);
+  }
+
+  .text-gray-300 {
+    color: var(--color-gray-300);
   }
 
   .text-gray-400 {
@@ -2896,6 +2921,10 @@
 
     .hover\:bg-cyan-500:hover {
       background-color: var(--color-cyan-500);
+    }
+
+    .hover\:bg-gray-700:hover {
+      background-color: var(--color-gray-700);
     }
 
     .hover\:bg-green-500\/20:hover {

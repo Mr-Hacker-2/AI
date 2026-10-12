@@ -8,3 +8,17 @@ captures
 conversations.json
 training
 *.gguf
+
+# Runtime data, logs, recordings, and local model artifacts
+*.log
+logs/
+recordings/
+captures/
+*.wav
+*.db
+*.sqlite
+*.sqlite3
+Python-*.tgz
+test_results*.json
+task_jobs.json
+.env
